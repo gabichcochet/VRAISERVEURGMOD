@@ -4,8 +4,12 @@ const express = require('express');
 const session = require('express-session');
 const passport = require('./config/steamConfig');
 
-const pagesRoutes = require('./routes/pages.routes');
+const indexRoutes = require('./routes/index.routes');
 const authRoutes = require('./routes/auth.routes');
+const shopRoutes = require('./routes/shop.routes');
+const userRoutes = require('./routes/user.routes');
+const adminRoutes = require('./routes/admin.routes');
+
 
 const app = express();
 const cors = require('cors');
@@ -30,8 +34,11 @@ app.use(
 app.use(passport.initialize());
 app.use(passport.session());
 
-
-app.use('/', pagesRoutes);
+// Ajouter après les routes existantes:
+app.use('/api/shop', shopRoutes);
+app.use('/api', userRoutes);
+app.use('/api/admin', adminRoutes);
+app.use('/', indexRoutes);
 app.use('/', authRoutes);
 
 app.listen(PORT, () => {

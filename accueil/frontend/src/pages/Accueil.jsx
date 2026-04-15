@@ -2,14 +2,13 @@ import React, { useEffect, useState } from 'react';
 import Card from '../components/Card';
 import '../css/theme.css';
 
-
 export default function Accueil() {
   const [user, setUser] = useState(null);
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
     fetch('/api/me', {
-      credentials: "include", // envoie les cookies de session
+      credentials: "include",
     })
       .then((res) => res.json())
       .then((data) => {
@@ -23,43 +22,60 @@ export default function Accueil() {
       .finally(() => setLoading(false));
   }, []);
 
-  if (loading) return <p>Chargement...</p>;
+  if (loading) {
     return (
-        <div className="accueil">
-            <header className="header">
-                <div className="overlay">
-                  <h1>JUJUTSU KAISEN GMod</h1>
-                <p>
-                    Bienvenue sur notre serveur GMod inspiré de l'univers de Jujutsu Kaisen.
-                    Explorez la boutique et rejoignez la communauté !
-                </p>  
-                        </div>
-
-
-            {user ? (
-                <div className="user-info">
-                <p>Connecté : {user.steamId}</p>
-                <a href="/api/logout">
-                    <button className="btn">Se déconnecter</button>
-                </a>
-                </div>
-            ) : (
-                <div className="user-info">
-                    <p>Tu n'es pas connecté.</p>
-                    <a href="/api/auth/steam">
-                        <button>Se connecter avec Steam</button>
-                    </a>
-                </div>
-            )}
-
-     </header>
-             {/* Section cartes */}
-        <section className="sections">
-            <Card title="Boutique" link="/boutique" />
-            <Card title="Membres" link="/membres" />
-            <Card title="Serveur" link="/serveur" />
-            <Card title="Documentation" link="/docs" />
-        </section>
+      <div className="accueil">
+        <div className="loading-container">
+          <p className="loading-text">Chargement...</p>
         </div>
+      </div>
     );
+  }
+
+  return (
+    <div className="accueil">
+      <header className="header">
+        <div className="header-content">
+          <div className="overlay">
+            <h1>JUJUTSU KAISEN</h1>
+            <h2>Serveur Garry's Mod</h2>
+            <p>
+              Bienvenue sur notre serveur GMod inspiré de l'univers de Jujutsu Kaisen.
+              Rejoignez la communauté et participez à des aventures épiques !
+            </p>
+          </div>
+          
+          <div className="auth-section">
+            {user ? (
+              <div className="user-logged">
+                <div className="user-details">
+                  <span className="user-label">Connecté en tant que</span>
+                  <span className="user-steamid">{user.steamId}</span>
+                </div>
+                <a href="/api/logout" className="auth-button logout-btn">
+                  Se déconnecter
+                </a>
+              </div>
+            ) : (
+              <div className="user-not-logged">
+                <p className="not-connected-text">Connecte-toi pour débloquer toutes les fonctionnalités</p>
+                <a href="/api/auth/steam" className="auth-button login-btn">
+                  <span>🔓</span> Se connecter avec Steam
+                </a>
+              </div>
+            )}
+          </div>
+        </div>
+      </header>
+
+      <section className="main-content">
+        <div className="sections-container">
+          <Card title="🛍️ Boutique" link="/boutique" />
+          <Card title="👥 Membres" link="/membres" />
+          <Card title="🖥️ Serveur" link="/serveur" />
+          <Card title="📚 Documentation" link="/docs" />
+        </div>
+      </section>
+    </div>
+  );
 }

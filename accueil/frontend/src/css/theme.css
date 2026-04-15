@@ -6,33 +6,102 @@ body {
   color: #fff;
 }
 
+/* NAVIGATION GLOBALE */
+.global-nav {
+  display: flex;
+  justify-content: center;
+  gap: 20px;
+  background: #1a1a1a;
+  padding: 15px 20px;
+  border-bottom: 2px solid #e64343;
+  position: sticky;
+  top: 0;
+  z-index: 100;
+  flex-wrap: wrap;
+}
+
+.global-nav a {
+  text-decoration: none;
+  color: #fff;
+  padding: 10px 15px;
+  border-radius: 8px;
+  transition: 0.3s;
+  font-weight: 500;
+  font-size: 0.95rem;
+}
+
+.global-nav a:hover {
+  background: #e64343;
+  color: #fff;
+  transform: translateY(-2px);
+}
+
 /* HEADER */
 .header {
   position: relative;
-  height: 60vh;
-  background: url('/images/header.jpg') center/cover no-repeat;
+  height: 70vh;
+  background: linear-gradient(135deg, #1a1a1a 0%, #2a2a2a 100%), url('/images/header.jpg') center/cover no-repeat;
   display: flex;
   justify-content: center;
   align-items: center;
+  overflow: hidden;
+}
+
+.header::before {
+  content: '';
+  position: absolute;
+  top: 0;
+  left: 0;
+  right: 0;
+  bottom: 0;
+  background: rgba(0, 0, 0, 0.4);
+  z-index: 1;
+}
+
+.header-content {
+  position: relative;
+  z-index: 2;
+  display: flex;
+  flex-direction: column;
+  justify-content: center;
+  align-items: center;
+  width: 100%;
+  height: 100%;
+  gap: 40px;
 }
 
 .header .overlay {
   text-align: center;
-  background: rgba(0, 0, 0, 0.65);
-  padding: 40px;
+  background: rgba(0, 0, 0, 0.5);
+  padding: 50px;
   border-radius: 15px;
-  width: 70%;
+  width: 80%;
+  max-width: 700px;
+  border: 2px solid rgba(230, 67, 67, 0.3);
 }
 
 .header h1 {
-  font-size: 3rem;
-  margin-bottom: 10px;
+  font-size: 3.5rem;
+  margin: 0 0 10px 0;
   color: #e64343;
+  font-weight: 800;
+  text-shadow: 0 2px 10px rgba(230, 67, 67, 0.5);
+  letter-spacing: 2px;
+}
+
+.header h2 {
+  font-size: 1.8rem;
+  margin: 0 0 20px 0;
+  color: #fff;
+  font-weight: 300;
+  opacity: 0.9;
 }
 
 .header p {
-  font-size: 1.2rem;
-  opacity: 0.9;
+  font-size: 1.1rem;
+  opacity: 0.85;
+  line-height: 1.6;
+  margin: 0;
 }
 
 /* BOUTONS */
@@ -52,12 +121,124 @@ body {
   background: #ff5757;
 }
 
-/* SECTIONS */
-.sections {
+/* AUTH SECTION */
+.auth-section {
+  width: 90%;
+  max-width: 500px;
+  z-index: 2;
+}
+
+.user-logged,
+.user-not-logged {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 15px;
+  background: rgba(0, 0, 0, 0.6);
+  padding: 25px;
+  border-radius: 12px;
+  border: 1px solid rgba(230, 67, 67, 0.2);
+}
+
+.user-details {
+  display: flex;
+  flex-direction: column;
+  align-items: center;
+  gap: 8px;
+}
+
+.user-label {
+  font-size: 0.9rem;
+  opacity: 0.7;
+  text-transform: uppercase;
+  letter-spacing: 1px;
+}
+
+.user-steamid {
+  font-size: 1.2rem;
+  font-weight: 600;
+  color: #e64343;
+}
+
+.not-connected-text {
+  margin: 0;
+  opacity: 0.8;
+  font-size: 0.95rem;
+}
+
+.auth-button {
+  display: flex;
+  align-items: center;
+  justify-content: center;
+  gap: 8px;
+  padding: 12px 30px;
+  border: none;
+  border-radius: 8px;
+  font-weight: 600;
+  text-decoration: none;
+  cursor: pointer;
+  transition: 0.3s ease;
+  font-size: 1rem;
+}
+
+.login-btn {
+  background: linear-gradient(135deg, #e64343, #ff5757);
+  color: white;
+}
+
+.login-btn:hover {
+  transform: translateY(-2px);
+  box-shadow: 0 8px 20px rgba(230, 67, 67, 0.4);
+}
+
+.logout-btn {
+  background: #333;
+  color: #fff;
+  border: 1px solid #e64343;
+}
+
+.logout-btn:hover {
+  background: #e64343;
+  box-shadow: 0 8px 20px rgba(230, 67, 67, 0.3);
+}
+
+/* LOADING */
+.loading-container {
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  min-height: 100vh;
+  background: #0d0d0d;
+}
+
+.loading-text {
+  font-size: 1.5rem;
+  color: #e64343;
+  font-weight: 600;
+  animation: pulse 1.5s ease-in-out infinite;
+}
+
+@keyframes pulse {
+  0%, 100% {
+    opacity: 0.6;
+  }
+  50% {
+    opacity: 1;
+  }
+}
+
+/* MAIN CONTENT */
+.main-content {
+  padding: 60px 20px;
+  background: #0d0d0d;
+}
+
+.sections-container {
   display: grid;
   grid-template-columns: repeat(auto-fit, minmax(250px, 1fr));
   gap: 25px;
-  padding: 40px;
+  max-width: 1200px;
+  margin: 0 auto;
 }
 
 /* CARD */
@@ -86,4 +267,19 @@ body {
   margin: 0;
   text-align: center;
   font-size: 1.3rem;
+  font-weight: 600;
+}
+
+/* APP */
+.app {
+  min-height: 100vh;
+  background: #0d0d0d;
+}
+
+/* ACCUEIL */
+.accueil {
+  display: flex;
+  flex-direction: column;
+  min-height: 100vh;
+  background: #0d0d0d;
 }
