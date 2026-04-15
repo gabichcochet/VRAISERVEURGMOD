@@ -1,22 +1,18 @@
 const passport = require('passport');
-const OpenIDStrategy = require('passport-openid').Strategy;
+const SteamStrategy = require('passport-steam').Strategy;
 
-const {STEAM_REALM, STEAM_RETURN_URL} = process.env;
+const {STEAM_API_KEY, STEAM_RETURN_URL} = process.env;
 
 passport.use(
-    'steam',
-    new OpenIDStrategy(
+    new SteamStrategy(
         {
-        providerURL: 'http://steamcommunity.com/openid',
-        returnURL: STEAM_RETURN_URL,
-        realm: STEAM_REALM,
-        stateless: true,
+            returnURL: STEAM_RETURN_URL,
+            realm: process.env.STEAM_REALM,
+            apiKey: STEAM_API_KEY,
         },
-        (identifier, done) => {
-            const match = identifier.match(/(\d+)$/);
-            const steamId = match ? match[1] : identifier;
-            
-            return done(null, { steamId });
+        (identifier, profile, done) => {
+            const steamId = profile.id;
+            return done(null, { steamId, profile });
         }
     )
 );

@@ -17,6 +17,7 @@
     "express-session": "^1.18.2",
     "passport": "^0.7.0",
     "passport-openid": "^0.3.1",
+    "passport-steam": "^1.0.18",
     "sqlite3": "^6.0.1"
   }
 }

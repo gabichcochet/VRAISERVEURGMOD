@@ -7,7 +7,7 @@ export default function Accueil() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('/api/me', {
+    fetch('http://localhost:3000/me', {
       credentials: "include",
     })
       .then((res) => res.json())
@@ -52,14 +52,14 @@ export default function Accueil() {
                   <span className="user-label">Connecté en tant que</span>
                   <span className="user-steamid">{user.steamId}</span>
                 </div>
-                <a href="/api/logout" className="auth-button logout-btn">
+                <a href="http://localhost:3000/logout" className="auth-button logout-btn">
                   Se déconnecter
                 </a>
               </div>
             ) : (
               <div className="user-not-logged">
                 <p className="not-connected-text">Connecte-toi pour débloquer toutes les fonctionnalités</p>
-                <a href="/api/auth/steam" className="auth-button login-btn">
+                <a href="http://localhost:3000/auth/steam" className="auth-button login-btn">
                   <span>🔓</span> Se connecter avec Steam
                 </a>
               </div>

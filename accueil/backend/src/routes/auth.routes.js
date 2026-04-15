@@ -20,7 +20,8 @@ router.get(
 
         res.redirect('http://localhost:5173/');
     } catch (err) {
-        next(err);
+        console.error('Erreur lors de l\'authentification:', err);
+        res.status(500).send('Erreur interne du serveur');
     }
   }
 );
