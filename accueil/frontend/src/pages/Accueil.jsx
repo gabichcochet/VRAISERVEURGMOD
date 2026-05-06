@@ -7,7 +7,7 @@ export default function Accueil() {
   const [loading, setLoading] = useState(true);
 
   useEffect(() => {
-    fetch('http://localhost:3000/me', {
+    fetch('/api/me', {
       credentials: "include",
     })
       .then((res) => res.json())

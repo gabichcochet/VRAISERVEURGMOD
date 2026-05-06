@@ -6,20 +6,24 @@ export default function PayPalReturn() {
     const [searchParams] = useSearchParams();
     const navigate = useNavigate();
     const [status, setStatus] = useState('processing');
+    const [errorMessage, setErrorMessage] = useState('');
 
     useEffect(() => {
-        const orderId = searchParams.get('orderId');
+        const pendingPayment = JSON.parse(sessionStorage.getItem('pendingPayPalPayment') || '{}');
+        const orderId = searchParams.get('orderId') || pendingPayment.orderId;
+        const paypalOrderId = searchParams.get('token') || pendingPayment.paypalOrderId;
 
-        if (!orderId) {
+        if (!orderId && !paypalOrderId) {
+            setErrorMessage('Retour PayPal invalide ou incomplet.');
             setStatus('error');
             return;
         }
 
         // Confirmer le paiement PayPal
-        confirmPayPalPayment(orderId);
+        confirmPayPalPayment(orderId, paypalOrderId);
     }, [searchParams]);
 
-    const confirmPayPalPayment = async (orderId) => {
+    const confirmPayPalPayment = async (orderId, paypalOrderId) => {
         try {
             const response = await fetch('/api/shop/confirm-payment', {
                 method: 'POST',
@@ -28,13 +32,14 @@ export default function PayPalReturn() {
                 },
                 credentials: 'include',
                 body: JSON.stringify({
-                    paypalOrderId: 'PAYPAL_' + orderId, // Simulation
+                    paypalOrderId,
                     orderId: orderId
                 })
             });
 
             if (response.ok) {
                 const data = await response.json();
+                sessionStorage.removeItem('pendingPayPalPayment');
                 setStatus('success');
                 // Rediriger vers la page de succès après un court délai
                 setTimeout(() => {
@@ -46,10 +51,13 @@ export default function PayPalReturn() {
                     });
                 }, 2000);
             } else {
+                const errorData = await response.json().catch(() => ({}));
+                setErrorMessage(errorData.error || 'Le paiement n’a pas pu être confirmé.');
                 setStatus('error');
             }
         } catch (error) {
             console.error('Erreur confirmation PayPal:', error);
+            setErrorMessage('Erreur de connexion pendant la confirmation PayPal.');
             setStatus('error');
         }
     };
@@ -76,7 +84,7 @@ export default function PayPalReturn() {
                 {status === 'error' && (
                     <>
                         <h1>❌ Erreur de paiement</h1>
-                        <p>Une erreur s'est produite lors de la confirmation du paiement.</p>
+                        <p>{errorMessage || 'Une erreur s’est produite lors de la confirmation du paiement.'}</p>
                         <button onClick={() => navigate('/boutique')}>
                             Retour à la boutique
                         </button>

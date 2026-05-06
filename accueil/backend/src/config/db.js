@@ -74,6 +74,24 @@ function initializeDatabase() {
                 FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
             )
         `);
+        db.run(`
+            CREATE TABLE IF NOT EXISTS shop_cart (
+               id INTEGER PRIMARY KEY AUTOINCREMENT,
+               user_id INTEGER NOT NULL,
+               item_id INTEGER NOT NULL,
+               quantity INTEGER DEFAULT 1,
+               created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+               UNIQUE(user_id, item_id),
+               FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+               FOREIGN KEY (item_id) REFERENCES shop_items(id) ON DELETE CASCADE
+            )
+        `, (err) => {
+            if (err) {
+                console.error('Erreur création table shop_cart:', err);
+            } else {
+                console.log('Table shop_cart prête');
+           }
+        });
 
         // Table items de commande
         db.run(`
@@ -173,12 +191,150 @@ function initializeDatabase() {
         `);
 
         // Créer les indexes
+        migrateShopOrdersSchema();
+        migrateShopOrderItemsSchema();
+
         db.run(`CREATE INDEX IF NOT EXISTS idx_users_steam_id ON users(steam_id)`);
         db.run(`CREATE INDEX IF NOT EXISTS idx_users_rank ON users(rank)`);
         db.run(`CREATE INDEX IF NOT EXISTS idx_shop_orders_user_id ON shop_orders(user_id)`);
         db.run(`CREATE INDEX IF NOT EXISTS idx_shop_orders_status ON shop_orders(status)`);
         db.run(`CREATE INDEX IF NOT EXISTS idx_sanctions_user_id ON sanctions(user_id)`);
         db.run(`CREATE INDEX IF NOT EXISTS idx_sanctions_active ON sanctions(is_active)`);
+    });
+}
+
+function migrateShopOrdersSchema() {
+    db.all(`PRAGMA table_info(shop_orders)`, (err, columns) => {
+        if (err) {
+            console.error('Erreur lecture schema shop_orders:', err);
+            return;
+        }
+
+        const hasLegacyRequiredItem = columns.some(column => column.name === 'item_id' && column.notnull === 1);
+        const hasPaypalOrderId = columns.some(column => column.name === 'paypal_order_id');
+
+        if (!hasLegacyRequiredItem && hasPaypalOrderId) {
+            return;
+        }
+
+        console.log('Migration de la table shop_orders vers le schema PayPal...');
+
+        db.run('ALTER TABLE shop_orders RENAME TO shop_orders_legacy', (renameErr) => {
+            if (renameErr) {
+                console.error('Erreur renommage shop_orders:', renameErr);
+                return;
+            }
+
+            db.run(`
+                CREATE TABLE shop_orders (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    user_id INTEGER NOT NULL,
+                    total_price REAL NOT NULL,
+                    paypal_order_id TEXT UNIQUE,
+                    promo_code_used TEXT,
+                    status TEXT DEFAULT 'pending',
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                    completed_at TEXT,
+                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+                )
+            `, (createErr) => {
+                if (createErr) {
+                    console.error('Erreur creation nouveau shop_orders:', createErr);
+                    return;
+                }
+
+                db.run(`
+                    INSERT INTO shop_orders
+                        (id, user_id, total_price, paypal_order_id, promo_code_used, status, created_at, completed_at)
+                    SELECT
+                        id,
+                        user_id,
+                        total_price,
+                        NULL,
+                        promo_code_used,
+                        status,
+                        created_at,
+                        completed_at
+                    FROM shop_orders_legacy
+                `, (copyErr) => {
+                    if (copyErr) {
+                        console.error('Erreur copie anciennes commandes:', copyErr);
+                        return;
+                    }
+
+                    db.run('DROP TABLE shop_orders_legacy', (dropErr) => {
+                        if (dropErr) console.error('Erreur suppression ancienne table shop_orders:', dropErr);
+                        else console.log('Migration shop_orders terminee');
+                    });
+                });
+            });
+        });
+    });
+}
+
+function migrateShopOrderItemsSchema() {
+    db.all(`PRAGMA foreign_key_list(shop_order_items)`, (err, foreignKeys) => {
+        if (err) {
+            console.error('Erreur lecture cles etrangeres shop_order_items:', err);
+            return;
+        }
+
+        const pointsToLegacyOrders = foreignKeys.some(fk => fk.table === 'shop_orders_legacy');
+
+        if (!pointsToLegacyOrders) {
+            return;
+        }
+
+        console.log('Migration de la table shop_order_items vers shop_orders...');
+
+        db.run('ALTER TABLE shop_order_items RENAME TO shop_order_items_legacy', (renameErr) => {
+            if (renameErr) {
+                console.error('Erreur renommage shop_order_items:', renameErr);
+                return;
+            }
+
+            db.run(`
+                CREATE TABLE shop_order_items (
+                    id INTEGER PRIMARY KEY AUTOINCREMENT,
+                    order_id INTEGER NOT NULL,
+                    item_id INTEGER NOT NULL,
+                    quantity INTEGER DEFAULT 1,
+                    price_at_time REAL NOT NULL,
+                    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                    FOREIGN KEY (order_id) REFERENCES shop_orders(id) ON DELETE CASCADE,
+                    FOREIGN KEY (item_id) REFERENCES shop_items(id) ON DELETE CASCADE
+                )
+            `, (createErr) => {
+                if (createErr) {
+                    console.error('Erreur creation nouveau shop_order_items:', createErr);
+                    return;
+                }
+
+                db.run(`
+                    INSERT INTO shop_order_items
+                        (id, order_id, item_id, quantity, price_at_time, created_at)
+                    SELECT
+                        id,
+                        order_id,
+                        item_id,
+                        quantity,
+                        price_at_time,
+                        created_at
+                    FROM shop_order_items_legacy
+                    WHERE order_id IN (SELECT id FROM shop_orders)
+                `, (copyErr) => {
+                    if (copyErr) {
+                        console.error('Erreur copie anciens items de commande:', copyErr);
+                        return;
+                    }
+
+                    db.run('DROP TABLE shop_order_items_legacy', (dropErr) => {
+                        if (dropErr) console.error('Erreur suppression ancienne table shop_order_items:', dropErr);
+                        else console.log('Migration shop_order_items terminee');
+                    });
+                });
+            });
+        });
     });
 }
 

@@ -2,6 +2,17 @@ const express = require('express');
 const router = express.Router();
 const db = require('../config/db');
 
+function createLocalPayment(total, dbOrderId, items) {
+    const amount = Number(total).toFixed(2);
+
+    return {
+        paypalOrderId: `LOCAL_${dbOrderId}_${Date.now()}`,
+        total: amount,
+        currency: 'EUR',
+        items
+    };
+}
+
 // Middleware pour vérifier l'authentification
 const isAuthenticated = (req, res, next) => {
     if (req.isAuthenticated()) {
@@ -21,6 +32,7 @@ router.get('/categories', (req, res) => {
             COUNT(i.id) as item_count
         FROM shop_categories c
         LEFT JOIN shop_items i ON c.id = i.category_id AND i.in_stock = 1
+        GROUP BY c.id
         ORDER BY c.order_index ASC
     `, (err, rows) => {
         if (err) {
@@ -109,20 +121,29 @@ router.post('/promo/validate', isAuthenticated, (req, res) => {
     });
 });
 
-// ============ ROUTES PAYPAL ============
+// ============ ROUTES PAIEMENT ============
 
-// Créer un paiement PayPal
+// Créer un paiement local
 router.post('/create-payment-intent', isAuthenticated, (req, res) => {
     const { items, promoCode } = req.body;
     const userId = req.user.id;
 
-    if (!items || items.length === 0) {
+    if (!Array.isArray(items) || items.length === 0) {
         return res.status(400).json({ error: 'Panier vide' });
     }
 
+    const cartItems = items.map(item => ({
+        itemId: Number(item.itemId),
+        quantity: Math.max(1, Number(item.quantity) || 1)
+    }));
+
+    if (cartItems.some(item => !Number.isInteger(item.itemId) || item.itemId <= 0)) {
+        return res.status(400).json({ error: 'Panier invalide' });
+    }
+
     // Valider que les items existent et sont en stock
-    const placeholders = items.map(() => '?').join(',');
-    const itemIds = items.map(i => i.itemId);
+    const placeholders = cartItems.map(() => '?').join(',');
+    const itemIds = cartItems.map(i => i.itemId);
 
     db.all(`
         SELECT id, name, price, in_stock FROM shop_items
@@ -136,9 +157,14 @@ router.post('/create-payment-intent', isAuthenticated, (req, res) => {
             return res.status(400).json({ error: 'Certains articles ne sont plus disponibles' });
         }
 
+        const dbItemsById = new Map(dbItems.map(item => [item.id, item]));
+
         // Calculer le total
-        let total = items.reduce((sum, cartItem) => {
-            const dbItem = dbItems.find(i => i.id === cartItem.itemId);
+        let total = cartItems.reduce((sum, cartItem) => {
+            const dbItem = dbItemsById.get(cartItem.itemId);
+            if (!dbItem) {
+                return sum;
+            }
             return sum + (dbItem.price * (cartItem.quantity || 1));
         }, 0);
 
@@ -161,14 +187,14 @@ router.post('/create-payment-intent', isAuthenticated, (req, res) => {
                     }
                 }
 
-                createOrderAndPayPalPayment(finalTotal, userId, items, appliedPromo);
+                createOrderAndLocalPayment(finalTotal, userId, cartItems, appliedPromo, dbItemsById);
             });
         } else {
-            createOrderAndPayPalPayment(finalTotal, userId, items, null);
+            createOrderAndLocalPayment(finalTotal, userId, cartItems, null, dbItemsById);
         }
     });
 
-    function createOrderAndPayPalPayment(total, userId, items, promo) {
+    function createOrderAndLocalPayment(total, userId, items, promo, dbItemsById) {
         // Créer la commande en base
         const orderId = 'ORD_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
 
@@ -186,95 +212,132 @@ router.post('/create-payment-intent', isAuthenticated, (req, res) => {
             const orderItems = items.map(item => ({
                 order_id: dbOrderId,
                 item_id: item.itemId,
-                quantity: item.quantity,
-                price_at_time: dbItems.find(i => i.id === item.itemId).price
+                quantity: item.quantity || 1,
+                price_at_time: dbItemsById.get(item.itemId).price
             }));
 
             let completed = 0;
+            let insertFailed = false;
             orderItems.forEach(orderItem => {
                 db.run(`
                     INSERT INTO shop_order_items (order_id, item_id, quantity, price_at_time)
                     VALUES (?, ?, ?, ?)
                 `, [orderItem.order_id, orderItem.item_id, orderItem.quantity, orderItem.price_at_time], (err) => {
-                    if (err) console.error('Erreur insertion item commande:', err);
+                    if (err) {
+                        console.error('Erreur insertion item commande:', err);
+                        if (!insertFailed) {
+                            insertFailed = true;
+                            return res.status(500).json({ error: 'Erreur lors de la creation de la commande' });
+                        }
+                        return;
+                    }
+                    if (insertFailed) return;
                     completed++;
                     if (completed === orderItems.length) {
-                        // Tous les items insérés, créer le paiement PayPal
-                        createPayPalOrder(total, orderId, dbOrderId, items);
+                        // Tous les items insérés, préparer le paiement local
+                        createLocalOrderPayment(total, dbOrderId, items);
                     }
                 });
             });
         });
     }
 
-    function createPayPalOrder(total, orderId, dbOrderId, items) {
-        // Simulation PayPal - En production, utiliser l'API PayPal
-        const paypalOrder = {
-            id: 'PAYPAL_' + orderId,
-            status: 'CREATED',
-            links: [
-                {
-                    href: `http://localhost:5173/paiement/paypal-return?orderId=${dbOrderId}`,
-                    rel: 'approve',
-                    method: 'GET'
-                }
-            ]
-        };
+    function createLocalOrderPayment(total, dbOrderId, items) {
+        try {
+            const payment = createLocalPayment(total, dbOrderId, items);
 
-        res.json({
-            paypalOrderId: paypalOrder.id,
-            orderId: dbOrderId,
-            total: total,
-            currency: 'EUR',
-            items: items,
-            approvalUrl: paypalOrder.links[0].href
-        });
+            db.run(`
+                UPDATE shop_orders
+                SET paypal_order_id = ?
+                WHERE id = ? AND status = 'pending'
+            `, [payment.paypalOrderId, dbOrderId], (err) => {
+                if (err) {
+                    return res.status(500).json({ error: 'Erreur lors de l\'enregistrement du paiement' });
+                }
+
+                res.json({
+                    paypalOrderId: payment.paypalOrderId,
+                    orderId: dbOrderId,
+                    total: Number(payment.total),
+                    currency: payment.currency,
+                    items: payment.items
+                });
+            });
+        } catch (err) {
+            console.error('Erreur création paiement:', err);
+            db.run(`UPDATE shop_orders SET status = 'failed' WHERE id = ? AND status = 'pending'`, [dbOrderId]);
+            res.status(500).json({ error: err.message || 'Erreur lors de la création du paiement' });
+        }
     }
 });
 
-// Confirmer le paiement PayPal
-router.post('/confirm-payment', isAuthenticated, (req, res) => {
+// Confirmer le paiement local
+router.post('/confirm-payment', isAuthenticated, async (req, res) => {
     const { paypalOrderId, orderId } = req.body;
     const userId = req.user.id;
 
-    // Simuler la confirmation PayPal (en production, vérifier avec l'API PayPal)
-    // Ici on marque simplement la commande comme payée
+    if (!paypalOrderId && !orderId) {
+        return res.status(400).json({ error: 'Informations de paiement manquantes' });
+    }
 
-    db.run(`
-        UPDATE shop_orders
-        SET status = 'completed', completed_at = datetime('now'), paypal_order_id = ?
-        WHERE id = ? AND user_id = ? AND status = 'pending'
-    `, [paypalOrderId, orderId, userId], function(err) {
+    const whereClause = orderId
+        ? 'id = ? AND user_id = ? AND status = \'pending\''
+        : 'paypal_order_id = ? AND user_id = ? AND status = \'pending\'';
+    const whereParams = orderId ? [orderId, userId] : [paypalOrderId, userId];
+
+    db.get(`
+        SELECT id, total_price, paypal_order_id, status
+        FROM shop_orders
+        WHERE ${whereClause}
+    `, whereParams, async (err, order) => {
         if (err) {
-            return res.status(500).json({ error: 'Erreur lors de la confirmation' });
+            return res.status(500).json({ error: 'Erreur lors de la lecture de la commande' });
         }
 
-        if (this.changes === 0) {
+        if (!order) {
             return res.status(404).json({ error: 'Commande non trouvée ou déjà traitée' });
         }
 
-        // Log de l'action admin
-        logAdminAction(null, 'order_completed', userId, 'order', orderId, {
-            paypalOrderId,
-            paymentMethod: 'paypal'
-        }, req.ip);
+        const effectivePaymentOrderId = paypalOrderId || order.paypal_order_id;
+        const effectiveOrderId = orderId || order.id;
 
-        res.json({
-            success: true,
-            orderId: orderId,
-            message: 'Paiement PayPal confirmé avec succès'
+        if (!effectivePaymentOrderId) {
+            return res.status(400).json({ error: 'Identifiant de paiement manquant pour cette commande' });
+        }
+
+        if (paypalOrderId && order.paypal_order_id !== paypalOrderId) {
+            return res.status(400).json({ error: 'Identifiant de paiement invalide pour cette commande' });
+        }
+
+        db.run(`
+            UPDATE shop_orders
+            SET status = 'completed', completed_at = datetime('now')
+            WHERE id = ? AND user_id = ? AND status = 'pending'
+        `, [effectiveOrderId, userId], function(updateErr) {
+            if (updateErr) {
+                return res.status(500).json({ error: 'Erreur lors de la confirmation' });
+            }
+
+            if (this.changes === 0) {
+                return res.status(404).json({ error: 'Commande non trouvée ou déjà traitée' });
+            }
+
+            logAdminAction(null, 'order_completed', userId, 'order', effectiveOrderId, {
+                paymentOrderId: effectivePaymentOrderId,
+                paymentMethod: 'local'
+            }, req.ip);
+
+            res.json({
+                success: true,
+                orderId: effectiveOrderId,
+                message: 'Paiement confirmé avec succès'
+            });
         });
     });
 });
 
-// Webhook PayPal (à implémenter avec les credentials PayPal)
+// Webhook paiement conservé pour compatibilité
 router.post('/webhook', express.raw({type: 'application/json'}), (req, res) => {
-    const signature = req.headers['paypal-transmission-signature'];
-
-    // TODO: Vérifier la signature avec PAYPAL_WEBHOOK_ID
-    // TODO: Traiter les événements PayPal (payment.completed, etc.)
-    // TODO: Mettre à jour le statut des commandes
-
     res.json({ received: true });
 });
 
@@ -286,12 +349,13 @@ router.get('/orders/my', isAuthenticated, (req, res) => {
 
     db.all(`
         SELECT 
-            o.id, o.item_id, o.quantity, o.total_price, o.status,
+            o.id, oi.item_id, oi.quantity, o.total_price, o.status,
             i.name as item_name, i.image_url,
             c.name as category_name,
             o.created_at, o.completed_at
         FROM shop_orders o
-        JOIN shop_items i ON o.item_id = i.id
+        JOIN shop_order_items oi ON oi.order_id = o.id
+        JOIN shop_items i ON oi.item_id = i.id
         JOIN shop_categories c ON i.category_id = c.id
         WHERE o.user_id = ?
         ORDER BY o.created_at DESC
@@ -402,6 +466,10 @@ router.post('/admin/promo-codes', isAuthenticated, (req, res) => {
 
 // Fonction pour enregistrer les actions admin
 function logAdminAction(adminId, action, targetUserId, resourceType, resourceId, details, ip) {
+    if (!adminId) {
+        return;
+    }
+
     db.run(`
         INSERT INTO admin_logs 
         (admin_user_id, action, target_user_id, target_resource_type, target_resource_id, details, ip_address)

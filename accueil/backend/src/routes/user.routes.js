@@ -190,7 +190,7 @@ router.get('/history/purchases', isAuthenticated, (req, res) => {
 
     db.all(`
         SELECT 
-            o.id, o.item_id, o.quantity, o.total_price, o.status,
+            o.id, oi.item_id, oi.quantity, o.total_price, o.status,
             i.name as item_name, i.image_url,
             c.name as category_name,
             o.created_at, o.completed_at,
@@ -200,7 +200,8 @@ router.get('/history/purchases', isAuthenticated, (req, res) => {
                  WHEN o.status = 'refunded' THEN 'Remboursée'
                  ELSE o.status END as status_label
         FROM shop_orders o
-        JOIN shop_items i ON o.item_id = i.id
+        JOIN shop_order_items oi ON oi.order_id = o.id
+        JOIN shop_items i ON oi.item_id = i.id
         JOIN shop_categories c ON i.category_id = c.id
         WHERE o.user_id = ?
         ORDER BY o.created_at DESC

@@ -4,7 +4,6 @@ import './Boutique.css';
 
 export default function Boutique() {
     const navigate = useNavigate();
-
     const [categories, setCategories] = useState([]);
     const [selectedCategory, setSelectedCategory] = useState(null);
     const [items, setItems] = useState([]);
@@ -15,29 +14,23 @@ export default function Boutique() {
     const [promoDiscount, setPromoDiscount] = useState(0);
     const [user, setUser] = useState(null);
 
-    const [cartLoaded, setCartLoaded] = useState(false);
-
-    // 🔥 LOAD CART (fix anti reset)
+    // 🔥 CHARGEMENT PANIER (localStorage)
     useEffect(() => {
         try {
-            const saved = localStorage.getItem('cart');
-            if (saved) {
-                const parsed = JSON.parse(saved);
-                if (Array.isArray(parsed)) setCart(parsed);
+            const savedCart = localStorage.getItem('cart');
+            if (savedCart) {
+                setCart(JSON.parse(savedCart));
             }
-        } catch (e) {
-            console.error(e);
+        } catch (err) {
+            console.error("Erreur chargement panier:", err);
             localStorage.removeItem('cart');
-        } finally {
-            setCartLoaded(true);
         }
     }, []);
 
-    // 🔥 SAVE CART
+    // 🔥 SAUVEGARDE PANIER AUTOMATIQUE
     useEffect(() => {
-        if (!cartLoaded) return;
         localStorage.setItem('cart', JSON.stringify(cart));
-    }, [cart, cartLoaded]);
+    }, [cart]);
 
     useEffect(() => {
         checkAuth();
@@ -45,44 +38,65 @@ export default function Boutique() {
     }, []);
 
     useEffect(() => {
-        if (selectedCategory) loadItems(selectedCategory);
+        if (selectedCategory) {
+            loadItems(selectedCategory);
+        }
     }, [selectedCategory]);
 
     const checkAuth = async () => {
         try {
             const res = await fetch('/api/me', { credentials: 'include' });
-            const data = await res.json();
-            if (data.loggedIn) setUser(data.user);
+            if (res.ok) {
+                const data = await res.json();
+                if (data.loggedIn) {
+                    setUser(data.user);
+                }
+            }
         } catch (err) {
-            console.error(err);
+            console.error('Erreur auth:', err);
         }
     };
 
     const loadCategories = async () => {
         try {
             const res = await fetch('/api/shop/categories');
-            const data = await res.json();
-
-            setCategories(data);
-
-            if (data.length > 0) setSelectedCategory(data[0].id);
-
-            setLoading(false);
+            if (res.ok) {
+                const data = await res.json();
+                setCategories(data);
+                if (data.length > 0) {
+                    setSelectedCategory(data[0].id);
+                } else {
+                    setItems([]);
+                    setLoading(false);
+                }
+            } else {
+                console.error('Erreur chargement catégories:', res.statusText || res.status);
+                setLoading(false);
+            }
         } catch (err) {
-            console.error(err);
+            console.error('Erreur chargement catégories:', err);
             setLoading(false);
         }
     };
 
     const loadItems = async (categoryId) => {
-        setLoading(true);
+        if (!categoryId) {
+            setItems([]);
+            setLoading(false);
+            return;
+        }
 
+        setLoading(true);
         try {
             const res = await fetch(`/api/shop/items/category/${categoryId}`);
-            const data = await res.json();
-            setItems(data);
+            if (res.ok) {
+                setItems(await res.json());
+            } else {
+                console.error('Erreur chargement items:', res.statusText || res.status);
+                setItems([]);
+            }
         } catch (err) {
-            console.error(err);
+            console.error('Erreur chargement items:', err);
             setItems([]);
         } finally {
             setLoading(false);
@@ -90,79 +104,98 @@ export default function Boutique() {
     };
 
     const addToCart = (item) => {
-        const exist = cart.find(i => i.id === item.id);
-
-        if (exist) {
+        const existingItem = cart.find(i => i.id === item.id);
+        if (existingItem) {
             setCart(cart.map(i =>
-                i.id === item.id
-                    ? { ...i, quantity: i.quantity + 1 }
-                    : i
+                i.id === item.id ? { ...i, quantity: i.quantity + 1 } : i
             ));
         } else {
             setCart([...cart, { ...item, quantity: 1 }]);
         }
     };
 
-    const removeFromCart = (id) => {
-        setCart(cart.filter(i => i.id !== id));
+    const removeFromCart = (itemId) => {
+        setCart(cart.filter(i => i.id !== itemId));
     };
 
-    const updateQuantity = (id, qty) => {
-        if (qty <= 0) return removeFromCart(id);
-
-        setCart(cart.map(i =>
-            i.id === id ? { ...i, quantity: qty } : i
-        ));
+    const updateQuantity = (itemId, quantity) => {
+        if (quantity <= 0) {
+            removeFromCart(itemId);
+        } else {
+            setCart(cart.map(i =>
+                i.id === itemId ? { ...i, quantity } : i
+            ));
+        }
     };
 
-    const getSubtotal = () =>
-        cart.reduce((s, i) => s + i.price * i.quantity, 0);
+    const validatePromo = async () => {
+        if (!promoCode) return;
 
-    const getTotal = () => getSubtotal() - promoDiscount;
+        try {
+            const total = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+            const res = await fetch('/api/shop/promo/validate', {
+                method: 'POST',
+                headers: { 'Content-Type': 'application/json' },
+                credentials: 'include',
+                body: JSON.stringify({ code: promoCode, totalPrice: total })
+            });
 
-    const handleCheckout = () => {
-        if (!user) return alert("Connecte-toi !");
-        if (cart.length === 0) return alert("Panier vide");
+            if (res.ok) {
+                const data = await res.json();
+                setPromoDiscount(data.discount);
+            } else {
+                const err = await res.json();
+                alert(err.error);
+            }
+        } catch (err) {
+            console.error('Erreur validation promo:', err);
+        }
+    };
 
-        localStorage.removeItem('cart');
-        setCart([]);
+    const getTotalPrice = () => {
+        const subtotal = cart.reduce((sum, item) => sum + (item.price * item.quantity), 0);
+        return subtotal - promoDiscount;
+    };
+
+    const handleCheckout = async () => {
+        if (!user) {
+            alert('Vous devez être connecté pour commander');
+            return;
+        }
+
+        if (cart.length === 0) {
+            alert('Votre panier est vide');
+            return;
+        }
 
         navigate('/paiement', {
             state: {
-                cart,
-                promoCode,
-                promoDiscount,
-                totalPrice: getSubtotal()
+                cart: cart,
+                promoCode: promoCode,
+                promoDiscount: promoDiscount,
+                totalPrice: cart.reduce((sum, item) => sum + (item.price * item.quantity), 0)
             }
         });
     };
 
     return (
         <div className="boutique-container">
-
-            {/* HEADER ORIGINAL RESTAURÉ */}
             <div className="boutique-header">
-
                 <div className="header-content">
                     <h1>Boutique du Serveur</h1>
                     <p>Achetez des items exclusifs pour votre expérience de jeu</p>
                 </div>
-
                 <button
                     className="cart-btn"
                     onClick={() => setShowCart(!showCart)}
                 >
                     🛒 Panier ({cart.length})
                 </button>
-
             </div>
 
             <div className="boutique-content">
-
-                {/* CATEGORIES */}
                 <div className="categories-sidebar">
                     <h3>Catégories</h3>
-
                     {categories.map(cat => (
                         <button
                             key={cat.id}
@@ -176,13 +209,9 @@ export default function Boutique() {
                     ))}
                 </div>
 
-                {/* MAIN */}
                 <div className="main-content">
-
                     {!showCart ? (
-
                         <div className="items-grid">
-
                             {loading ? (
                                 <p>Chargement...</p>
                             ) : items.length === 0 ? (
@@ -190,22 +219,14 @@ export default function Boutique() {
                             ) : (
                                 items.map(item => (
                                     <div key={item.id} className="item-card">
-
                                         {item.image_url && (
-                                            <img
-                                                src={item.image_url}
-                                                className="item-image"
-                                                alt={item.name}
-                                            />
+                                            <img src={item.image_url} alt={item.name} className="item-image" />
                                         )}
-
                                         <div className="item-info">
                                             <h4>{item.name}</h4>
                                             <p className="item-desc">{item.description}</p>
-
                                             <div className="item-footer">
                                                 <span className="price">{item.price}€</span>
-
                                                 <button
                                                     className="add-btn"
                                                     onClick={() => addToCart(item)}
@@ -214,99 +235,75 @@ export default function Boutique() {
                                                 </button>
                                             </div>
                                         </div>
-
                                     </div>
                                 ))
                             )}
-
                         </div>
-
                     ) : (
-
                         <div className="cart-panel">
-
                             <h2>Votre Panier</h2>
-
                             {cart.length === 0 ? (
                                 <p className="empty-cart">Panier vide</p>
                             ) : (
                                 <>
                                     <div className="cart-items">
-
                                         {cart.map(item => (
                                             <div key={item.id} className="cart-item">
-
                                                 <div className="cart-item-info">
                                                     <h5>{item.name}</h5>
                                                     <p>{item.price}€ x {item.quantity}</p>
                                                 </div>
-
                                                 <div className="cart-item-controls">
                                                     <button onClick={() => updateQuantity(item.id, item.quantity - 1)}>-</button>
                                                     <span>{item.quantity}</span>
                                                     <button onClick={() => updateQuantity(item.id, item.quantity + 1)}>+</button>
                                                 </div>
-
                                                 <button
                                                     className="remove-btn"
                                                     onClick={() => removeFromCart(item.id)}
                                                 >
                                                     ✕
                                                 </button>
-
                                             </div>
                                         ))}
-
                                     </div>
 
                                     <div className="promo-section">
                                         <input
+                                            type="text"
+                                            placeholder="Code promo"
                                             value={promoCode}
                                             onChange={(e) => setPromoCode(e.target.value)}
-                                            placeholder="Code promo"
                                         />
-                                        <button>Appliquer</button>
+                                        <button onClick={validatePromo}>Appliquer</button>
                                     </div>
 
                                     <div className="cart-summary">
-
                                         <div className="summary-line">
                                             <span>Sous-total</span>
-                                            <span>{getSubtotal().toFixed(2)}€</span>
+                                            <span>{(cart.reduce((sum, item) => sum + (item.price * item.quantity), 0)).toFixed(2)}€</span>
                                         </div>
-
                                         {promoDiscount > 0 && (
                                             <div className="summary-line discount">
                                                 <span>Réduction</span>
                                                 <span>-{promoDiscount.toFixed(2)}€</span>
                                             </div>
                                         )}
-
                                         <div className="summary-line total">
                                             <span>Total</span>
-                                            <span>{getTotal().toFixed(2)}€</span>
+                                            <span>{getTotalPrice().toFixed(2)}€</span>
                                         </div>
-
                                     </div>
 
-                                    <button
-                                        className="checkout-btn"
-                                        onClick={handleCheckout}
-                                    >
-                                        Paiement
+                                    <button className="checkout-btn" onClick={handleCheckout}>
+                                        Procéder au paiement
                                     </button>
-
                                 </>
                             )}
-
                         </div>
-
                     )}
-
                 </div>
-
             </div>
-
         </div>
     );
 }

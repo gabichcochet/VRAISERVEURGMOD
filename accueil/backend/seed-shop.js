@@ -23,6 +23,7 @@ const db = new sqlite3.Database(dbPath, (err) => {
         { category_id: 1, name: 'Sniper Elite', description: 'Fusil de précision haute performance', price: 49.99, image_url: null, in_stock: 1 },
         { category_id: 2, name: 'Lamborghini Diablo', description: 'Voiture de sport italienne', price: 99.99, image_url: null, in_stock: 1 },
         { category_id: 2, name: 'Hélicoptère Apache', description: 'Véhicule aérien militaire', price: 149.99, image_url: null, in_stock: 1 },
+        { category_id: 1, name: 'Fusil Plasma X', description: 'Arme futuriste de haute précision', price: 39.99, image_url: null, in_stock: 1 },
         { category_id: 3, name: 'Skin Dragon Rouge', description: 'Apparence épique avec effets de feu', price: 19.99, image_url: null, in_stock: 1 },
         { category_id: 3, name: 'Pack VIP Premium', description: 'Pack complet avec tous les cosmétiques', price: 79.99, image_url: null, in_stock: 1 }
     ];
