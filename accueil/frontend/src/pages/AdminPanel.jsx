@@ -33,18 +33,22 @@ export default function AdminPanel() {
         try {
             const res = await fetch('/api/me', { credentials: 'include' });
             if (res.ok) {
-                const user = await res.json();
+                const data = await res.json();
+                const user = data.user;
                 const adminRanks = ['owner', 'superadmin', 'responsable', 'admin', 'moderator', 'helper'];
-                if (adminRanks.includes(user.rank)) {
+                if (data.loggedIn && user && adminRanks.includes(user.rank)) {
                     setAdmin(user);
+                } else if (!data.loggedIn) {
+                    window.location.href = 'http://localhost:3000/auth/steam';
                 } else {
                     window.location.href = '/';
                 }
             } else {
-                window.location.href = '/login';
+                window.location.href = '/';
             }
         } catch (err) {
             console.error('Erreur auth:', err);
+            window.location.href = '/';
         } finally {
             setLoading(false);
         }

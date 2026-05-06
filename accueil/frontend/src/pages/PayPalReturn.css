@@ -1,0 +1,56 @@
+.paypal-return-container {
+    min-height: 100vh;
+    display: flex;
+    align-items: center;
+    justify-content: center;
+    background: linear-gradient(135deg, #667eea 0%, #764ba2 100%);
+    padding: 20px;
+}
+
+.paypal-return-content {
+    background: white;
+    border-radius: 12px;
+    padding: 40px;
+    text-align: center;
+    box-shadow: 0 10px 30px rgba(0, 0, 0, 0.2);
+    max-width: 500px;
+    width: 100%;
+}
+
+.paypal-return-content h1 {
+    color: #333;
+    margin-bottom: 20px;
+    font-size: 2rem;
+}
+
+.paypal-return-content p {
+    color: #666;
+    margin-bottom: 20px;
+    font-size: 1.1rem;
+}
+
+.loading-spinner {
+    font-size: 3rem;
+    margin: 20px 0;
+    animation: spin 1s linear infinite;
+}
+
+@keyframes spin {
+    from { transform: rotate(0deg); }
+    to { transform: rotate(360deg); }
+}
+
+.paypal-return-content button {
+    background: #0070ba;
+    color: white;
+    border: none;
+    padding: 12px 24px;
+    border-radius: 6px;
+    font-size: 1rem;
+    cursor: pointer;
+    transition: background 0.3s ease;
+}
+
+.paypal-return-content button:hover {
+    background: #005ea6;
+}

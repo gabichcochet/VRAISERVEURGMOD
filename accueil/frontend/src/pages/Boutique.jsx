@@ -28,7 +28,10 @@ export default function Boutique() {
         try {
             const res = await fetch('/api/me', { credentials: 'include' });
             if (res.ok) {
-                setUser(await res.json());
+                const data = await res.json();
+                if (data.loggedIn) {
+                    setUser(data.user);
+                }
             }
         } catch (err) {
             console.error('Erreur auth:', err);
@@ -43,21 +46,39 @@ export default function Boutique() {
                 setCategories(data);
                 if (data.length > 0) {
                     setSelectedCategory(data[0].id);
+                } else {
+                    setItems([]);
+                    setLoading(false);
                 }
+            } else {
+                console.error('Erreur chargement catégories:', res.statusText || res.status);
+                setLoading(false);
             }
         } catch (err) {
             console.error('Erreur chargement catégories:', err);
+            setLoading(false);
         }
     };
 
     const loadItems = async (categoryId) => {
+        if (!categoryId) {
+            setItems([]);
+            setLoading(false);
+            return;
+        }
+
+        setLoading(true);
         try {
             const res = await fetch(`/api/shop/items/category/${categoryId}`);
             if (res.ok) {
                 setItems(await res.json());
+            } else {
+                console.error('Erreur chargement items:', res.statusText || res.status);
+                setItems([]);
             }
         } catch (err) {
             console.error('Erreur chargement items:', err);
+            setItems([]);
         } finally {
             setLoading(false);
         }
@@ -123,25 +144,20 @@ export default function Boutique() {
             return;
         }
 
-        try {
-            const res = await fetch('/api/shop/checkout', {
-                method: 'POST',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({ 
-                    items: cart.map(i => ({ itemId: i.id, quantity: i.quantity })),
-                    promoCode: promoCode || null
-                })
-            });
-
-            if (res.ok) {
-                const data = await res.json();
-                // TODO: Rediriger vers Stripe avec clientSecret
-                alert('Redirection vers le paiement Stripe...');
-            }
-        } catch (err) {
-            console.error('Erreur checkout:', err);
+        if (cart.length === 0) {
+            alert('Votre panier est vide');
+            return;
         }
+
+        // Rediriger vers la page de paiement avec les données du panier
+        navigate('/paiement', {
+            state: {
+                cart: cart,
+                promoCode: promoCode,
+                promoDiscount: promoDiscount,
+                totalPrice: cart.reduce((sum, item) => sum + (item.price * item.quantity), 0)
+            }
+        });
     };
 
     return (

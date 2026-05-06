@@ -9,6 +9,9 @@ import Lore from './pages/Lore';
 import Profil from './pages/Profil';
 import Reglement from './pages/Reglement';
 import AdminPanel from './pages/AdminPanel';
+import Paiement from './pages/Paiement';
+import PaiementSucces from './pages/PaiementSucces';
+import PayPalReturn from './pages/PayPalReturn';
 
 export default function App() {
     return (
@@ -31,6 +34,9 @@ export default function App() {
                 <Route path="/profil" element={<Profil />} />
                 <Route path="/reglement" element={<Reglement />} />
                 <Route path="/admin" element={<AdminPanel />} />
+                <Route path="/paiement" element={<Paiement />} />
+                <Route path="/paiement/succes" element={<PaiementSucces />} />
+                <Route path="/paiement/paypal-return" element={<PayPalReturn />} />
             </Routes>
         </>
     );
