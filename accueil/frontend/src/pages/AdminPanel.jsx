@@ -1,6 +1,7 @@
 import React, { useState, useEffect } from 'react';
 import './AdminPanel.css';
 
+
 export default function AdminPanel() {
     const [admin, setAdmin] = useState(null);
     const [activeTab, setActiveTab] = useState('dashboard');
@@ -11,6 +12,21 @@ export default function AdminPanel() {
     const [promoCodes, setPromoCodes] = useState([]);
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
+
+    useEffect(() => {
+    const delay = setTimeout(() => {
+        loadUsers();
+    }, 300);
+
+    return () => clearTimeout(delay);
+    }, [searchQuery]);
+
+    const [sanctionForm, setSanctionForm] = useState({
+    userId: '',
+    type: 'warning',
+    reason: '',
+    duration: ''
+    });
 
     const handleChangeRank = async (userId, rank) => {
     try {
@@ -248,7 +264,7 @@ const handleDeleteShopItem = async (itemId) => {
                                 <p className="big-number">{stats.totalUsers}</p>
                             </div>
                             <div className="dashboard-card">
-                                <h3>Commandes Complétées</h3>
+                                <h3>Commandes </h3>
                                 <p className="big-number">{stats.totalOrders}</p>
                             </div>
                             <div className="dashboard-card">
@@ -272,6 +288,7 @@ const handleDeleteShopItem = async (itemId) => {
                                 type="text" 
                                 placeholder="Rechercher un utilisateur..."
                                 value={searchQuery}
+                                
                                 onChange={(e) => {
                                     setSearchQuery(e.target.value);
                                     setTimeout(() => loadUsers(), 300);
@@ -312,6 +329,41 @@ const handleDeleteShopItem = async (itemId) => {
                 {activeTab === 'sanctions' && (
                     <div className="admin-section">
                         <h1>Gestion des Sanctions</h1>
+
+                        {/* FORMULAIRE CREATION SANCTION */}
+                        <div className="sanction-create">
+                            <h3>Créer une sanction</h3>
+
+                            <input type="number" placeholder="ID utilisateur" id="sanctionUserId" />
+
+                            <select id="sanctionType">
+                                <option value="warning">Warning</option>
+                                <option value="mute">Mute</option>
+                                <option value="ban">Ban</option>
+                            </select>
+
+                            <input type="text" placeholder="Raison" id="sanctionReason" />
+
+                            <input
+                                type="number"
+                                placeholder="Durée en jours (vide = permanent)"
+                                id="sanctionDuration"
+                            />
+
+                            <button
+                                className="lift-btn"
+                                onClick={() => {
+                                    const userId = document.getElementById('sanctionUserId').value;
+                                    const type = document.getElementById('sanctionType').value;
+                                    const reason = document.getElementById('sanctionReason').value;
+                                    const duration = parseInt(document.getElementById('sanctionDuration').value) || null;
+
+                                    handleIssueSanction(userId, type, reason, duration || null);
+                                }}
+                            >
+                                Ajouter la sanction
+                            </button>
+                        </div>
                         <div className="sanctions-list">
                             {sanctions.map(sanction => (
                                 <div key={sanction.id} className={`sanction-item ${sanction.sanction_type}`}>
@@ -322,18 +374,48 @@ const handleDeleteShopItem = async (itemId) => {
                                         <p className="issued-by">Par: {sanction.issued_by}</p>
                                     </div>
                                     <div className="sanction-actions">
-                                        <span className={`status ${sanction.is_active ? 'active' : 'lifted'}`}>
-                                            {sanction.is_active ? 'Actif' : 'Levée'}
-                                        </span>
-                                        {sanction.is_active && (
-                                            <button 
-                                                className="lift-btn"
-                                                onClick={() => handleLiftSanction(sanction.id)}
-                                            >
-                                                Lever
-                                            </button>
-                                        )}
-                                    </div>
+                                    {(() => {
+                                        const now = new Date();
+                                        const expiresAt = sanction.expires_at ? new Date(sanction.expires_at) : null;
+
+                                        let statusLabel = 'Actif';
+                                        let statusClass = 'active';
+
+                                        if (!sanction.is_active && sanction.lifted_at) {
+                                            statusLabel = 'Levée par staff';
+                                            statusClass = 'lifted';
+                                        } else if (expiresAt && expiresAt < now) {
+                                            statusLabel = 'Expirée';
+                                            statusClass = 'expired';
+                                        } else if (!expiresAt) {
+                                            statusLabel = 'Permanente';
+                                            statusClass = 'permanent';
+                                        }
+
+                                        return (
+                                            <>
+                                                <span className={`status ${statusClass}`}>
+                                                    {statusLabel}
+                                                </span>
+
+                                                {sanction.expires_at && (
+                                                    <p className="expires">
+                                                        Expire le : {new Date(sanction.expires_at).toLocaleDateString('fr-FR')}
+                                                    </p>
+                                                )}
+
+                                                {sanction.is_active && (
+                                                    <button
+                                                        className="lift-btn"
+                                                        onClick={() => handleLiftSanction(sanction.id)}
+                                                    >
+                                                        Lever
+                                                    </button>
+                                                )}
+                                            </>
+                                        );
+                                    })()}
+                                </div>
                                 </div>
                             ))}
                         </div>

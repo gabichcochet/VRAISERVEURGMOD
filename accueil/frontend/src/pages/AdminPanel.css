@@ -289,6 +289,15 @@
                     color: #4ade80;
                 }
             }
+                    &.expired {
+            background: rgba(120, 120, 120, 0.2);
+            color: #888;
+        }
+
+        &.permanent {
+            background: rgba(156, 39, 176, 0.2);
+            color: #9c27b0;
+        }
 
             .lift-btn {
                 background: #e64343;
@@ -304,7 +313,29 @@
                 }
             }
         }
+        
     }
+}
+.sanction-create {
+    display: flex;
+    gap: 10px;
+    margin-bottom: 25px;
+    flex-wrap: wrap;
+}
+
+.sanction-create input,
+.sanction-create select {
+    padding: 8px 10px;
+    background: rgba(30,30,30,0.9);
+    border: 1px solid #333;
+    border-radius: 4px;
+    color: white;
+}
+
+.sanction-create input:focus,
+.sanction-create select:focus {
+    outline: none;
+    border-color: #e64343;
 }
 
 /* Shop List */

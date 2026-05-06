@@ -9,6 +9,9 @@ const db = new sqlite3.Database(dbPath, (err) => {
         console.error('❌ Erreur connexion SQLite:', err);
     } else {
         console.log('✅ Connecté à la base de données SQLite');
+
+        db.run('PRAGMA foreign_keys = ON'); // 👈 ICI
+
         initializeDatabase();
     }
 });
@@ -65,19 +68,29 @@ function initializeDatabase() {
 
         // ================= SHOP ORDERS =================
         db.run(`
-            CREATE TABLE IF NOT EXISTS shop_orders (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL,
-                total_price REAL NOT NULL,
-                paypal_order_id TEXT UNIQUE,
-                promo_code_used TEXT,
-                status TEXT DEFAULT 'pending',
-                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                completed_at TEXT,
-                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    CREATE TABLE IF NOT EXISTS shop_orders (
+        id INTEGER PRIMARY KEY AUTOINCREMENT,
+        user_id INTEGER NOT NULL,
+        total_price REAL NOT NULL,
+        paypal_order_id TEXT UNIQUE,
+        promo_code_used TEXT,
+        status TEXT DEFAULT 'pending',
+        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+        completed_at TEXT,
+        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+    )
+`);
+        db.run(`
+        CREATE TABLE IF NOT EXISTS shop_order_items (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            order_id INTEGER NOT NULL,
+            item_id INTEGER NOT NULL,
+            quantity INTEGER DEFAULT 1,
+            price REAL,
+            FOREIGN KEY (order_id) REFERENCES shop_orders(id) ON DELETE CASCADE,
+            FOREIGN KEY (item_id) REFERENCES shop_items(id) ON DELETE CASCADE
             )
         `);
-
         // ================= SHOP CART =================
         db.run(`
             CREATE TABLE IF NOT EXISTS shop_cart (
@@ -114,20 +127,20 @@ function initializeDatabase() {
 
         // ================= SANCTIONS =================
         db.run(`
-            CREATE TABLE IF NOT EXISTS sanctions (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL,
-                sanction_type TEXT NOT NULL,
-                reason TEXT NOT NULL,
-                duration_seconds INTEGER,
-                issued_by_user_id INTEGER NOT NULL,
-                is_active BOOLEAN DEFAULT 1,
-                lifted_by_user_id INTEGER,
-                lifted_at TEXT,
-                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                expires_at TEXT,
-                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-            )
+        CREATE TABLE IF NOT EXISTS sanctions (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            sanction_type TEXT NOT NULL,
+            reason TEXT NOT NULL,
+            duration_days INTEGER,
+            issued_by_user_id INTEGER NOT NULL,
+            is_active INTEGER DEFAULT 1,
+            lifted_by_user_id INTEGER,
+            lifted_at TEXT,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            expires_at TEXT,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        )
         `);
 
         // ================= ADMIN LOGS =================
@@ -159,9 +172,9 @@ function initializeDatabase() {
         `);
 
         // ================= INDEXES =================
+        db.run(`CREATE INDEX IF NOT EXISTS idx_shop_orders_user_id ON shop_orders(user_id)`);
         db.run(`CREATE INDEX IF NOT EXISTS idx_users_steam_id ON users(steam_id)`);
         db.run(`CREATE INDEX IF NOT EXISTS idx_users_rank ON users(rank)`);
-        db.run(`CREATE INDEX IF NOT EXISTS idx_shop_orders_user_id ON shop_orders(user_id)`);
         db.run(`CREATE INDEX IF NOT EXISTS idx_sanctions_user_id ON sanctions(user_id)`);
         db.run(`CREATE INDEX IF NOT EXISTS idx_sanctions_active ON sanctions(is_active)`);
 
@@ -176,28 +189,30 @@ function clearUserPurchases(userId, cb) {
     db.serialize(() => {
         db.run('BEGIN TRANSACTION');
 
-        db.run(`
-            DELETE FROM shop_order_items
-            WHERE order_id IN (
-                SELECT id FROM shop_orders WHERE user_id = ?
-            )
-        `, [userId]);
+        db.run(
+            `DELETE FROM shop_order_items 
+             WHERE order_id IN (SELECT id FROM shop_orders WHERE user_id = ?)`,
+            [userId],
+            (err) => {
+                if (err) {
+                    db.run('ROLLBACK');
+                    return cb?.(err);
+                }
 
-        db.run(`
-            DELETE FROM shop_orders
-            WHERE user_id = ?
-        `, [userId]);
+                db.run(
+                    `DELETE FROM shop_orders WHERE user_id = ?`,
+                    [userId],
+                    (err2) => {
+                        if (err2) {
+                            db.run('ROLLBACK');
+                            return cb?.(err2);
+                        }
 
-        db.run('COMMIT', (err) => {
-            if (err) {
-                console.error('❌ Erreur suppression achats:', err);
-            } else {
-                console.log(`🧹 Achats supprimés user_id=${userId}`);
+                        db.run('COMMIT', cb);
+                    }
+                );
             }
-
-            if (cb) cb(err);
-        });
+        );
     });
 }
-
 module.exports = db;
