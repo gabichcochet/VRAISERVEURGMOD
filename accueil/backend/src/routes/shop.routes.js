@@ -109,10 +109,10 @@ router.post('/promo/validate', isAuthenticated, (req, res) => {
     });
 });
 
-// ============ ROUTES STRIPE ============
+// ============ ROUTES PAYPAL ============
 
-// Créer une session de paiement Stripe
-router.post('/checkout', isAuthenticated, (req, res) => {
+// Créer un paiement PayPal
+router.post('/create-payment-intent', isAuthenticated, (req, res) => {
     const { items, promoCode } = req.body;
     const userId = req.user.id;
 
@@ -120,12 +120,12 @@ router.post('/checkout', isAuthenticated, (req, res) => {
         return res.status(400).json({ error: 'Panier vide' });
     }
 
-    // Valider que les items existent
+    // Valider que les items existent et sont en stock
     const placeholders = items.map(() => '?').join(',');
     const itemIds = items.map(i => i.itemId);
 
     db.all(`
-        SELECT id, price FROM shop_items 
+        SELECT id, name, price, in_stock FROM shop_items
         WHERE id IN (${placeholders}) AND in_stock = 1
     `, itemIds, (err, dbItems) => {
         if (err) {
@@ -133,7 +133,7 @@ router.post('/checkout', isAuthenticated, (req, res) => {
         }
 
         if (dbItems.length !== items.length) {
-            return res.status(400).json({ error: 'Certains items ne sont pas disponibles' });
+            return res.status(400).json({ error: 'Certains articles ne sont plus disponibles' });
         }
 
         // Calculer le total
@@ -143,46 +143,138 @@ router.post('/checkout', isAuthenticated, (req, res) => {
         }, 0);
 
         // Appliquer code promo si fourni
+        let finalTotal = total;
+        let appliedPromo = null;
+
         if (promoCode) {
             db.get(`
-                SELECT * FROM promo_codes 
+                SELECT * FROM promo_codes
                 WHERE code = ? AND is_active = 1
+                AND (expiry_date IS NULL OR expiry_date > datetime('now'))
             `, [promoCode.toUpperCase()], (err, promo) => {
                 if (!err && promo) {
+                    appliedPromo = promo;
                     if (promo.discount_type === 'percentage') {
-                        total *= (1 - promo.discount_value / 100);
+                        finalTotal = total * (1 - promo.discount_value / 100);
                     } else {
-                        total = Math.max(0, total - promo.discount_value);
+                        finalTotal = Math.max(0, total - promo.discount_value);
                     }
                 }
-                createPaymentIntent(total, userId, items, promoCode);
+
+                createOrderAndPayPalPayment(finalTotal, userId, items, appliedPromo);
             });
         } else {
-            createPaymentIntent(total, userId, items, null);
+            createOrderAndPayPalPayment(finalTotal, userId, items, null);
         }
     });
 
-    function createPaymentIntent(total, userId, items, promoCode) {
-        // NOTE: Intégration Stripe requise
-        // Pour maintenant, retourner l'info pour frontend
+    function createOrderAndPayPalPayment(total, userId, items, promo) {
+        // Créer la commande en base
+        const orderId = 'ORD_' + Date.now() + '_' + Math.random().toString(36).substr(2, 9);
+
+        db.run(`
+            INSERT INTO shop_orders (user_id, total_price, status, promo_code_used)
+            VALUES (?, ?, 'pending', ?)
+        `, [userId, total, promo ? promo.code : null], function(err) {
+            if (err) {
+                return res.status(500).json({ error: 'Erreur lors de la création de la commande' });
+            }
+
+            const dbOrderId = this.lastID;
+
+            // Insérer les items de la commande
+            const orderItems = items.map(item => ({
+                order_id: dbOrderId,
+                item_id: item.itemId,
+                quantity: item.quantity,
+                price_at_time: dbItems.find(i => i.id === item.itemId).price
+            }));
+
+            let completed = 0;
+            orderItems.forEach(orderItem => {
+                db.run(`
+                    INSERT INTO shop_order_items (order_id, item_id, quantity, price_at_time)
+                    VALUES (?, ?, ?, ?)
+                `, [orderItem.order_id, orderItem.item_id, orderItem.quantity, orderItem.price_at_time], (err) => {
+                    if (err) console.error('Erreur insertion item commande:', err);
+                    completed++;
+                    if (completed === orderItems.length) {
+                        // Tous les items insérés, créer le paiement PayPal
+                        createPayPalOrder(total, orderId, dbOrderId, items);
+                    }
+                });
+            });
+        });
+    }
+
+    function createPayPalOrder(total, orderId, dbOrderId, items) {
+        // Simulation PayPal - En production, utiliser l'API PayPal
+        const paypalOrder = {
+            id: 'PAYPAL_' + orderId,
+            status: 'CREATED',
+            links: [
+                {
+                    href: `http://localhost:5173/paiement/paypal-return?orderId=${dbOrderId}`,
+                    rel: 'approve',
+                    method: 'GET'
+                }
+            ]
+        };
+
         res.json({
-            clientSecret: 'placeholder_' + Date.now(),
-            amount: Math.round(total * 100), // Stripe utilise les centimes
-            currency: 'eur',
+            paypalOrderId: paypalOrder.id,
+            orderId: dbOrderId,
+            total: total,
+            currency: 'EUR',
             items: items,
-            promoCode: promoCode
+            approvalUrl: paypalOrder.links[0].href
         });
     }
 });
 
-// Webhook Stripe (à implémenter avec clé Stripe secrète)
+// Confirmer le paiement PayPal
+router.post('/confirm-payment', isAuthenticated, (req, res) => {
+    const { paypalOrderId, orderId } = req.body;
+    const userId = req.user.id;
+
+    // Simuler la confirmation PayPal (en production, vérifier avec l'API PayPal)
+    // Ici on marque simplement la commande comme payée
+
+    db.run(`
+        UPDATE shop_orders
+        SET status = 'completed', completed_at = datetime('now'), paypal_order_id = ?
+        WHERE id = ? AND user_id = ? AND status = 'pending'
+    `, [paypalOrderId, orderId, userId], function(err) {
+        if (err) {
+            return res.status(500).json({ error: 'Erreur lors de la confirmation' });
+        }
+
+        if (this.changes === 0) {
+            return res.status(404).json({ error: 'Commande non trouvée ou déjà traitée' });
+        }
+
+        // Log de l'action admin
+        logAdminAction(null, 'order_completed', userId, 'order', orderId, {
+            paypalOrderId,
+            paymentMethod: 'paypal'
+        }, req.ip);
+
+        res.json({
+            success: true,
+            orderId: orderId,
+            message: 'Paiement PayPal confirmé avec succès'
+        });
+    });
+});
+
+// Webhook PayPal (à implémenter avec les credentials PayPal)
 router.post('/webhook', express.raw({type: 'application/json'}), (req, res) => {
-    const signature = req.headers['stripe-signature'];
-    
-    // TODO: Vérifier la signature avec STRIPE_WEBHOOK_SECRET
-    // TODO: Mettre à jour le statut de la commande
-    // TODO: Enregistrer le log admin
-    
+    const signature = req.headers['paypal-transmission-signature'];
+
+    // TODO: Vérifier la signature avec PAYPAL_WEBHOOK_ID
+    // TODO: Traiter les événements PayPal (payment.completed, etc.)
+    // TODO: Mettre à jour le statut des commandes
+
     res.json({ received: true });
 });
 

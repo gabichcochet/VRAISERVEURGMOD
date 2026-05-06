@@ -65,15 +65,26 @@ function initializeDatabase() {
             CREATE TABLE IF NOT EXISTS shop_orders (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
                 user_id INTEGER NOT NULL,
-                item_id INTEGER NOT NULL,
-                quantity INTEGER DEFAULT 1,
                 total_price REAL NOT NULL,
-                stripe_payment_intent_id TEXT UNIQUE,
+                paypal_order_id TEXT UNIQUE,
                 promo_code_used TEXT,
                 status TEXT DEFAULT 'pending',
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP,
                 completed_at TEXT,
-                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+            )
+        `);
+
+        // Table items de commande
+        db.run(`
+            CREATE TABLE IF NOT EXISTS shop_order_items (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                order_id INTEGER NOT NULL,
+                item_id INTEGER NOT NULL,
+                quantity INTEGER DEFAULT 1,
+                price_at_time REAL NOT NULL,
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+                FOREIGN KEY (order_id) REFERENCES shop_orders(id) ON DELETE CASCADE,
                 FOREIGN KEY (item_id) REFERENCES shop_items(id) ON DELETE CASCADE
             )
         `);
