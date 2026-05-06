@@ -12,6 +12,24 @@ export default function AdminPanel() {
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
 
+    const handleChangeRank = async (userId, rank) => {
+    try {
+        const res = await fetch(`/api/admin/users/${userId}/rank`, {
+            method: 'PUT',
+            headers: { 'Content-Type': 'application/json' },
+            credentials: 'include',
+            body: JSON.stringify({ rank })
+        });
+
+        if (res.ok) {
+            loadUsers();
+        }
+    } catch (err) {
+        console.error(err);
+    }
+    };
+
+
     useEffect(() => {
         checkAdminAccess();
     }, []);
@@ -108,24 +126,30 @@ export default function AdminPanel() {
             console.error('Erreur chargement promos:', err);
         }
     };
+const handleDeleteShopItem = async (itemId) => {
+    if (!window.confirm('Supprimer cet article de la boutique ?')) return;
 
-    const handleChangeRank = async (userId, newRank) => {
-        try {
-            const res = await fetch(`/api/admin/users/${userId}/rank`, {
-                method: 'PUT',
-                headers: { 'Content-Type': 'application/json' },
-                credentials: 'include',
-                body: JSON.stringify({ rank: newRank })
-            });
+    try {
+        const res = await fetch(`/api/admin/shop/items/${itemId}`, {
+            method: 'DELETE',
+            credentials: 'include'
+        });
 
-            if (res.ok) {
-                alert('Rang mis à jour');
-                loadUsers();
-            }
-        } catch (err) {
-            console.error('Erreur changement rang:', err);
+        const data = await res.json().catch(() => ({}));
+
+        if (!res.ok) {
+            alert(data.error || 'Erreur suppression item');
+            return;
         }
-    };
+
+        // update UI instant
+        setShopItems(prev => prev.filter(item => item.id !== itemId));
+
+    } catch (err) {
+        console.error(err);
+        alert('Erreur serveur');
+    }
+};
 
     const handleIssueSanction = async (userId, type, reason, duration) => {
         try {
@@ -144,6 +168,7 @@ export default function AdminPanel() {
             console.error('Erreur sanction:', err);
         }
     };
+
 
     const handleLiftSanction = async (sanctionId) => {
         if (window.confirm('Êtes-vous sûr de lever cette sanction ?')) {
@@ -334,7 +359,12 @@ export default function AdminPanel() {
                                         <span className={`stock-badge ${item.in_stock ? 'in' : 'out'}`}>
                                             {item.in_stock ? '✓ En stock' : '✕ Rupture'}
                                         </span>
-                                        <button className="edit-btn">Modifier</button>
+                                        <button 
+                                            className="delete-btn"
+                                            onClick={() => handleDeleteShopItem(item.id)}
+                                        >
+                                            supprimer
+                                        </button>
                                     </div>
                                 </div>
                             ))}

@@ -2,7 +2,7 @@ const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 
 const dbPath = path.join(__dirname, 'db.sqlite');
-const steamId = 'STEAMID';
+const steamId = '76561199237398386';
 const username = 'Admin_User';
 
 const db = new sqlite3.Database(dbPath, (err) => {
@@ -19,29 +19,41 @@ const db = new sqlite3.Database(dbPath, (err) => {
         }
 
         if (user) {
-            db.run("UPDATE users SET rank = 'admin', updated_at = datetime('now') WHERE steam_id = ?", [steamId], function(err) {
-                if (err) {
-                    console.error('❌ Erreur lors de la mise à jour:', err);
+            db.run(
+                "UPDATE users SET rank = 'superadmin', updated_at = datetime('now') WHERE steam_id = ?",
+                [steamId],
+                function (err) {
+                    if (err) {
+                        console.error('❌ Erreur lors de la mise à jour:', err);
+                        db.close();
+                        process.exit(1);
+                    }
+
+                    console.log('🔥 Utilisateur promu SUPERADMIN.');
+                    console.log(`ID: ${user.id} | Nom: ${user.username || 'N/A'} | Rank: superadmin`);
+
                     db.close();
-                    process.exit(1);
+                    process.exit(0);
                 }
-                console.log('✅ Utilisateur existant promu administrateur.');
-                console.log(`ID: ${user.id} | Nom: ${user.username || 'N/A'} | Rank: admin`);
-                db.close();
-                process.exit(0);
-            });
+            );
         } else {
-            db.run('INSERT INTO users (steam_id, username, rank) VALUES (?, ?, ?)', [steamId, username, 'admin'], function(err) {
-                if (err) {
-                    console.error('❌ Erreur lors de la création:', err);
+            db.run(
+                'INSERT INTO users (steam_id, username, rank) VALUES (?, ?, ?)',
+                [steamId, username, 'superadmin'],
+                function (err) {
+                    if (err) {
+                        console.error('❌ Erreur lors de la création:', err);
+                        db.close();
+                        process.exit(1);
+                    }
+
+                    console.log('🔥 Utilisateur créé et promu SUPERADMIN.');
+                    console.log(`ID: ${this.lastID} | Nom: ${username} | Rank: superadmin`);
+
                     db.close();
-                    process.exit(1);
+                    process.exit(0);
                 }
-                console.log('✅ Utilisateur créé et promu administrateur.');
-                console.log(`ID: ${this.lastID} | Nom: ${username} | Rank: admin`);
-                db.close();
-                process.exit(0);
-            });
+            );
         }
     });
 });

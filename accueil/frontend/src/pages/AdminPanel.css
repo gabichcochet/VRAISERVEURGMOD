@@ -376,10 +376,10 @@
                 }
             }
 
-            .edit-btn {
+            .delete-btn {
                 background: #e64343;
                 border: none;
-                color: white;
+                color: #fff;
                 padding: 6px 12px;
                 border-radius: 3px;
                 cursor: pointer;

@@ -3,18 +3,21 @@ const path = require('path');
 
 const dbPath = path.join(__dirname, '../../db.sqlite');
 
+// ✅ Instance SQLite correcte (avec .get, .all, .run)
 const db = new sqlite3.Database(dbPath, (err) => {
     if (err) {
-        console.error('Erreur de connexion à la base de données:', err);
+        console.error('❌ Erreur connexion SQLite:', err);
     } else {
-        console.log('Connecté à la base de données SQLite');
+        console.log('✅ Connecté à la base de données SQLite');
         initializeDatabase();
     }
 });
 
 function initializeDatabase() {
     db.serialize(() => {
-        console.log('Initialisation de la base de données...');
+        console.log('🚀 Initialisation de la base de données...');
+
+        // ================= USERS =================
         db.run(`
             CREATE TABLE IF NOT EXISTS users (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -28,11 +31,11 @@ function initializeDatabase() {
                 updated_at TEXT DEFAULT CURRENT_TIMESTAMP
             )
         `, (err) => {
-            if (err) console.error('Erreur création table users:', err);
-            else console.log('Table users prête');
+            if (err) console.error('❌ Table users:', err);
+            else console.log('✅ Table users prête');
         });
 
-        // Table catégories de boutique
+        // ================= SHOP CATEGORIES =================
         db.run(`
             CREATE TABLE IF NOT EXISTS shop_categories (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -44,7 +47,7 @@ function initializeDatabase() {
             )
         `);
 
-        // Table articles de boutique
+        // ================= SHOP ITEMS =================
         db.run(`
             CREATE TABLE IF NOT EXISTS shop_items (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -60,7 +63,7 @@ function initializeDatabase() {
             )
         `);
 
-        // Table commandes
+        // ================= SHOP ORDERS =================
         db.run(`
             CREATE TABLE IF NOT EXISTS shop_orders (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -74,40 +77,25 @@ function initializeDatabase() {
                 FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
             )
         `);
+
+        // ================= SHOP CART =================
         db.run(`
             CREATE TABLE IF NOT EXISTS shop_cart (
-               id INTEGER PRIMARY KEY AUTOINCREMENT,
-               user_id INTEGER NOT NULL,
-               item_id INTEGER NOT NULL,
-               quantity INTEGER DEFAULT 1,
-               created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-               UNIQUE(user_id, item_id),
-               FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-               FOREIGN KEY (item_id) REFERENCES shop_items(id) ON DELETE CASCADE
-            )
-        `, (err) => {
-            if (err) {
-                console.error('Erreur création table shop_cart:', err);
-            } else {
-                console.log('Table shop_cart prête');
-           }
-        });
-
-        // Table items de commande
-        db.run(`
-            CREATE TABLE IF NOT EXISTS shop_order_items (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
-                order_id INTEGER NOT NULL,
+                user_id INTEGER NOT NULL,
                 item_id INTEGER NOT NULL,
                 quantity INTEGER DEFAULT 1,
-                price_at_time REAL NOT NULL,
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (order_id) REFERENCES shop_orders(id) ON DELETE CASCADE,
+                UNIQUE(user_id, item_id),
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
                 FOREIGN KEY (item_id) REFERENCES shop_items(id) ON DELETE CASCADE
             )
-        `);
+        `, (err) => {
+            if (err) console.error('❌ shop_cart:', err);
+            else console.log('✅ Table shop_cart prête');
+        });
 
-        // Table codes promo
+        // ================= PROMO CODES =================
         db.run(`
             CREATE TABLE IF NOT EXISTS promo_codes (
                 code TEXT PRIMARY KEY,
@@ -116,7 +104,6 @@ function initializeDatabase() {
                 max_uses INTEGER,
                 current_uses INTEGER DEFAULT 0,
                 min_purchase_amount REAL DEFAULT 0,
-                applicable_categories TEXT,
                 expiry_date TEXT,
                 is_active BOOLEAN DEFAULT 1,
                 created_by_user_id INTEGER,
@@ -125,21 +112,7 @@ function initializeDatabase() {
             )
         `);
 
-        // Table stats des joueurs
-        db.run(`
-            CREATE TABLE IF NOT EXISTS player_stats (
-                id INTEGER PRIMARY KEY AUTOINCREMENT,
-                user_id INTEGER NOT NULL UNIQUE,
-                playtime_seconds INTEGER DEFAULT 0,
-                session_count INTEGER DEFAULT 0,
-                last_session_start TEXT,
-                last_session_end TEXT,
-                updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-            )
-        `);
-
-        // Table sanctions
+        // ================= SANCTIONS =================
         db.run(`
             CREATE TABLE IF NOT EXISTS sanctions (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -153,13 +126,11 @@ function initializeDatabase() {
                 lifted_at TEXT,
                 created_at TEXT DEFAULT CURRENT_TIMESTAMP,
                 expires_at TEXT,
-                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
-                FOREIGN KEY (issued_by_user_id) REFERENCES users(id),
-                FOREIGN KEY (lifted_by_user_id) REFERENCES users(id)
+                FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
             )
         `);
 
-        // Table logs admin
+        // ================= ADMIN LOGS =================
         db.run(`
             CREATE TABLE IF NOT EXISTS admin_logs (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -170,13 +141,11 @@ function initializeDatabase() {
                 target_resource_id INTEGER,
                 details TEXT,
                 ip_address TEXT,
-                created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (admin_user_id) REFERENCES users(id),
-                FOREIGN KEY (target_user_id) REFERENCES users(id)
+                created_at TEXT DEFAULT CURRENT_TIMESTAMP
             )
         `);
 
-        // Table paramètres serveur
+        // ================= SERVER SETTINGS =================
         db.run(`
             CREATE TABLE IF NOT EXISTS server_settings (
                 id INTEGER PRIMARY KEY AUTOINCREMENT,
@@ -185,155 +154,48 @@ function initializeDatabase() {
                 setting_type TEXT DEFAULT 'string',
                 description TEXT,
                 updated_by_user_id INTEGER,
-                updated_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                FOREIGN KEY (updated_by_user_id) REFERENCES users(id)
+                updated_at TEXT DEFAULT CURRENT_TIMESTAMP
             )
         `);
 
-        // Créer les indexes
-        migrateShopOrdersSchema();
-        migrateShopOrderItemsSchema();
-
+        // ================= INDEXES =================
         db.run(`CREATE INDEX IF NOT EXISTS idx_users_steam_id ON users(steam_id)`);
         db.run(`CREATE INDEX IF NOT EXISTS idx_users_rank ON users(rank)`);
         db.run(`CREATE INDEX IF NOT EXISTS idx_shop_orders_user_id ON shop_orders(user_id)`);
-        db.run(`CREATE INDEX IF NOT EXISTS idx_shop_orders_status ON shop_orders(status)`);
         db.run(`CREATE INDEX IF NOT EXISTS idx_sanctions_user_id ON sanctions(user_id)`);
         db.run(`CREATE INDEX IF NOT EXISTS idx_sanctions_active ON sanctions(is_active)`);
+
+        console.log('✅ Base de données initialisée');
     });
 }
 
-function migrateShopOrdersSchema() {
-    db.all(`PRAGMA table_info(shop_orders)`, (err, columns) => {
-        if (err) {
-            console.error('Erreur lecture schema shop_orders:', err);
-            return;
-        }
+// ================= UTILS =================
 
-        const hasLegacyRequiredItem = columns.some(column => column.name === 'item_id' && column.notnull === 1);
-        const hasPaypalOrderId = columns.some(column => column.name === 'paypal_order_id');
+// ⚠️ Version SAFE de suppression (NE PAS appeler au boot)
+function clearUserPurchases(userId, cb) {
+    db.serialize(() => {
+        db.run('BEGIN TRANSACTION');
 
-        if (!hasLegacyRequiredItem && hasPaypalOrderId) {
-            return;
-        }
+        db.run(`
+            DELETE FROM shop_order_items
+            WHERE order_id IN (
+                SELECT id FROM shop_orders WHERE user_id = ?
+            )
+        `, [userId]);
 
-        console.log('Migration de la table shop_orders vers le schema PayPal...');
+        db.run(`
+            DELETE FROM shop_orders
+            WHERE user_id = ?
+        `, [userId]);
 
-        db.run('ALTER TABLE shop_orders RENAME TO shop_orders_legacy', (renameErr) => {
-            if (renameErr) {
-                console.error('Erreur renommage shop_orders:', renameErr);
-                return;
+        db.run('COMMIT', (err) => {
+            if (err) {
+                console.error('❌ Erreur suppression achats:', err);
+            } else {
+                console.log(`🧹 Achats supprimés user_id=${userId}`);
             }
 
-            db.run(`
-                CREATE TABLE shop_orders (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    user_id INTEGER NOT NULL,
-                    total_price REAL NOT NULL,
-                    paypal_order_id TEXT UNIQUE,
-                    promo_code_used TEXT,
-                    status TEXT DEFAULT 'pending',
-                    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                    completed_at TEXT,
-                    FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
-                )
-            `, (createErr) => {
-                if (createErr) {
-                    console.error('Erreur creation nouveau shop_orders:', createErr);
-                    return;
-                }
-
-                db.run(`
-                    INSERT INTO shop_orders
-                        (id, user_id, total_price, paypal_order_id, promo_code_used, status, created_at, completed_at)
-                    SELECT
-                        id,
-                        user_id,
-                        total_price,
-                        NULL,
-                        promo_code_used,
-                        status,
-                        created_at,
-                        completed_at
-                    FROM shop_orders_legacy
-                `, (copyErr) => {
-                    if (copyErr) {
-                        console.error('Erreur copie anciennes commandes:', copyErr);
-                        return;
-                    }
-
-                    db.run('DROP TABLE shop_orders_legacy', (dropErr) => {
-                        if (dropErr) console.error('Erreur suppression ancienne table shop_orders:', dropErr);
-                        else console.log('Migration shop_orders terminee');
-                    });
-                });
-            });
-        });
-    });
-}
-
-function migrateShopOrderItemsSchema() {
-    db.all(`PRAGMA foreign_key_list(shop_order_items)`, (err, foreignKeys) => {
-        if (err) {
-            console.error('Erreur lecture cles etrangeres shop_order_items:', err);
-            return;
-        }
-
-        const pointsToLegacyOrders = foreignKeys.some(fk => fk.table === 'shop_orders_legacy');
-
-        if (!pointsToLegacyOrders) {
-            return;
-        }
-
-        console.log('Migration de la table shop_order_items vers shop_orders...');
-
-        db.run('ALTER TABLE shop_order_items RENAME TO shop_order_items_legacy', (renameErr) => {
-            if (renameErr) {
-                console.error('Erreur renommage shop_order_items:', renameErr);
-                return;
-            }
-
-            db.run(`
-                CREATE TABLE shop_order_items (
-                    id INTEGER PRIMARY KEY AUTOINCREMENT,
-                    order_id INTEGER NOT NULL,
-                    item_id INTEGER NOT NULL,
-                    quantity INTEGER DEFAULT 1,
-                    price_at_time REAL NOT NULL,
-                    created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-                    FOREIGN KEY (order_id) REFERENCES shop_orders(id) ON DELETE CASCADE,
-                    FOREIGN KEY (item_id) REFERENCES shop_items(id) ON DELETE CASCADE
-                )
-            `, (createErr) => {
-                if (createErr) {
-                    console.error('Erreur creation nouveau shop_order_items:', createErr);
-                    return;
-                }
-
-                db.run(`
-                    INSERT INTO shop_order_items
-                        (id, order_id, item_id, quantity, price_at_time, created_at)
-                    SELECT
-                        id,
-                        order_id,
-                        item_id,
-                        quantity,
-                        price_at_time,
-                        created_at
-                    FROM shop_order_items_legacy
-                    WHERE order_id IN (SELECT id FROM shop_orders)
-                `, (copyErr) => {
-                    if (copyErr) {
-                        console.error('Erreur copie anciens items de commande:', copyErr);
-                        return;
-                    }
-
-                    db.run('DROP TABLE shop_order_items_legacy', (dropErr) => {
-                        if (dropErr) console.error('Erreur suppression ancienne table shop_order_items:', dropErr);
-                        else console.log('Migration shop_order_items terminee');
-                    });
-                });
-            });
+            if (cb) cb(err);
         });
     });
 }

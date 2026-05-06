@@ -3,6 +3,9 @@ const SteamStrategy = require('passport-steam').Strategy;
 
 const {STEAM_API_KEY, STEAM_RETURN_URL} = process.env;
 
+console.log("STEAM RETURN URL =", STEAM_RETURN_URL);
+console.log("STEAM REALM =", process.env.STEAM_REALM);
+
 passport.use(
     new SteamStrategy(
         {
