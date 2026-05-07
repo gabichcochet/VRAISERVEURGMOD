@@ -300,4 +300,188 @@ router.put('/sanctions/:id/lift', isAuthenticated, requireRank('moderator'), (re
     );
 });
 
+
+/* =========================
+   PROMO CODES LIST
+========================= */
+
+router.get('/promo-codes', isAuthenticated, requireRank('helper'), (req, res) => {
+    db.all(`
+        SELECT *
+        FROM promo_codes
+        ORDER BY created_at DESC
+    `, (err, rows) => {
+        if (err) {
+            return res.status(500).json({ error: err.message });
+        }
+
+        res.json(rows);
+    });
+});
+
+router.post('/promo-codes', isAuthenticated, requireRank('admin'), (req, res) => {
+    const admin = req.user;
+
+    const {
+        code,
+        discount_type,
+        discount_value,
+        max_uses,
+        min_purchase_amount,
+        expiry_date
+    } = req.body;
+
+    if (!code || !discount_type || !discount_value) {
+        return res.status(400).json({
+            error: 'Champs manquants'
+        });
+    }
+
+    const validTypes = ['percentage', 'fixed'];
+
+    if (!validTypes.includes(discount_type)) {
+        return res.status(400).json({
+            error: 'Type invalide'
+        });
+    }
+
+    db.run(`
+        INSERT INTO promo_codes (
+            code,
+            discount_type,
+            discount_value,
+            max_uses,
+            min_purchase_amount,
+            expiry_date,
+            created_by_user_id
+        )
+        VALUES (?, ?, ?, ?, ?, ?, ?)
+    `, [
+        code.toUpperCase(),
+        discount_type,
+        discount_value,
+        max_uses || null,
+        min_purchase_amount || 0,
+        expiry_date || null,
+        admin.id
+    ], function(err) {
+
+        if (err) {
+            return res.status(500).json({
+                error: err.message
+            });
+        }
+
+        logAdminAction(
+            admin.id,
+            'promo_created',
+            null,
+            'promo_code',
+            code,
+            {},
+            req.ip
+        );
+
+        res.json({
+            message: 'Code promo créé'
+        });
+    });
+});
+
+router.delete('/promo-codes/:code', isAuthenticated, requireRank('admin'), (req, res) => {
+    const { code } = req.params;
+
+    db.run(`
+        DELETE FROM promo_codes
+        WHERE code = ?
+    `, [code.toUpperCase()], function(err) {
+
+        if (err) {
+            return res.status(500).json({
+                error: err.message
+            });
+        }
+
+        if (this.changes === 0) {
+            return res.status(404).json({
+                error: 'Code introuvable'
+            });
+        }
+        res.json({
+            message: 'Code promo supprimé'
+        });
+    });
+});
+
+router.post('/promo-codes/validate', isAuthenticated, (req, res) => {
+
+    const { code, parsedTotal } = req.body;
+
+    const total = parseFloat(parsedTotal);
+
+    if (!Number.isFinite(total) || total < 0) {
+        return res.status(400).json({
+            error: 'Montant invalide'
+        });
+    }
+
+    if (!code) {
+        return res.status(400).json({
+            error: 'Code requis'
+        });
+    }
+
+    db.get(`
+        SELECT *
+        FROM promo_codes
+        WHERE code = ?
+        AND is_active = 1
+    `, [code.toUpperCase()], (err, promo) => {
+
+        if (err) {
+            return res.status(500).json({ error: err.message });
+        }
+
+        if (!promo) {
+            return res.status(404).json({ error: 'Code invalide' });
+        }
+
+        if (promo.expiry_date && new Date(promo.expiry_date) < new Date()) {
+            return res.status(400).json({ error: 'Code expiré' });
+        }
+
+        if (
+            promo.max_uses !== null &&
+            promo.current_uses >= promo.max_uses
+        ) {
+            return res.status(400).json({ error: 'Code épuisé' });
+        }
+
+        if (total < promo.min_purchase_amount) {
+            return res.status(400).json({
+                error: `Minimum requis: ${promo.min_purchase_amount}€`
+            });
+        }
+
+        let discount = 0;
+
+        if (promo.discount_type === 'percentage') {
+            discount = total * (promo.discount_value / 100);
+        } else {
+            discount = promo.discount_value;
+        }
+
+        discount = Math.min(discount, total);
+
+        const finalTotal = Math.max(total - discount, 0);
+
+        res.json({
+            valid: true,
+            code: promo.code,
+            discount,
+            finalTotal
+        });
+    });
+});
+
 module.exports = router;

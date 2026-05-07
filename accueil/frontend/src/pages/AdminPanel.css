@@ -481,6 +481,41 @@
     }
 }
 
+.promo-create {
+    display: flex;
+    flex-wrap: wrap;
+    gap: 10px;
+    margin-bottom: 25px;
+}
+
+.promo-create input,
+.promo-create select {
+    padding: 10px;
+    border-radius: 8px;
+    border: none;
+    background: #1f1f1f;
+    color: white;
+}
+
+.create-btn {
+    background: #2ecc71;
+    border: none;
+    padding: 10px 15px;
+    border-radius: 8px;
+    cursor: pointer;
+    color: white;
+    font-weight: bold;
+}
+
+.delete-btn {
+    background: #e74c3c;
+    border: none;
+    padding: 8px 12px;
+    border-radius: 8px;
+    color: white;
+    cursor: pointer;
+}
+
 @media (max-width: 1024px) {
     .admin-sidebar {
         width: 200px;

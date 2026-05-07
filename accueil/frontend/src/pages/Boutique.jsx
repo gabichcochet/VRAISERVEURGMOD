@@ -119,7 +119,44 @@ export default function Boutique() {
         cart.reduce((s, i) => s + i.price * i.quantity, 0);
 
     const getTotal = () => getSubtotal() - promoDiscount;
+        const handleApplyPromo = async () => {
 
+        if (!promoCode.trim()) {
+            return alert('Entre un code promo');
+        }
+
+        try {
+
+            const subtotal = getSubtotal();
+
+            const res = await fetch('/api/admin/promo-codes/validate', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                credentials: 'include',
+                body: JSON.stringify({
+                    code: promoCode,
+                    parsedTotal: subtotal
+                })
+            });
+
+            const data = await res.json();
+
+            if (!res.ok) {
+                setPromoDiscount(0);
+                return alert(data.error || 'Code invalide');
+            }
+
+            setPromoDiscount(data.discount);
+
+            alert(`Code appliqué : -${data.discount.toFixed(2)}€`);
+
+        } catch (err) {
+            console.error(err);
+            alert('Erreur serveur');
+        }
+    };
     const handleCheckout = () => {
         if (!user) return alert("Connecte-toi !");
         if (cart.length === 0) return alert("Panier vide");
@@ -131,8 +168,6 @@ export default function Boutique() {
             state: {
                 cart,
                 promoCode,
-                promoDiscount,
-                totalPrice: getSubtotal()
             }
         });
     };
@@ -265,7 +300,9 @@ export default function Boutique() {
                                             onChange={(e) => setPromoCode(e.target.value)}
                                             placeholder="Code promo"
                                         />
-                                        <button>Appliquer</button>
+                                        <button onClick={handleApplyPromo}>
+                                            Appliquer
+                                        </button>
                                     </div>
 
                                     <div className="cart-summary">

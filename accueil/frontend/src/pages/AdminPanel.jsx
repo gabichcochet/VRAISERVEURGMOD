@@ -13,6 +13,15 @@ export default function AdminPanel() {
     const [loading, setLoading] = useState(true);
     const [searchQuery, setSearchQuery] = useState('');
 
+        const [promoForm, setPromoForm] = useState({
+        code: '',
+        discount_type: 'percentage',
+        discount_value: '',
+        max_uses: '',
+        min_purchase_amount: '',
+        expiry_date: ''
+    });
+
     useEffect(() => {
     const delay = setTimeout(() => {
         loadUsers();
@@ -204,6 +213,74 @@ const handleDeleteShopItem = async (itemId) => {
         }
     };
 
+        const handleCreatePromo = async () => {
+        try {
+            const res = await fetch('/api/admin/promo-codes', {
+                method: 'POST',
+                headers: {
+                    'Content-Type': 'application/json'
+                },
+                credentials: 'include',
+                body: JSON.stringify({
+                    ...promoForm,
+                    discount_value: parseFloat(promoForm.discount_value),
+                    max_uses: promoForm.max_uses || null,
+                    min_purchase_amount: promoForm.min_purchase_amount || 0,
+                    expiry_date: promoForm.expiry_date || null
+                })
+            });
+
+            const data = await res.json();
+
+            if (!res.ok) {
+                return alert(data.error || 'Erreur création promo');
+            }
+
+            alert('Code promo créé');
+
+            setPromoForm({
+                code: '',
+                discount_type: 'percentage',
+                discount_value: '',
+                max_uses: '',
+                min_purchase_amount: '',
+                expiry_date: ''
+            });
+
+            loadPromoCodes();
+
+        } catch (err) {
+            console.error(err);
+            alert('Erreur serveur');
+        }
+    };
+
+
+        const handleDeletePromo = async (code) => {
+
+        if (!window.confirm(`Supprimer ${code} ?`)) return;
+
+        try {
+            const res = await fetch(`/api/admin/promo-codes/${code}`, {
+                method: 'DELETE',
+                credentials: 'include'
+            });
+
+            const data = await res.json();
+
+            if (!res.ok) {
+                return alert(data.error || 'Erreur suppression');
+            }
+
+            setPromoCodes(prev =>
+                prev.filter(p => p.code !== code)
+            );
+
+        } catch (err) {
+            console.error(err);
+            alert('Erreur serveur');
+        }
+    };
     if (loading) {
         return <div className="admin-loading">Chargement...</div>;
     }
@@ -455,32 +532,141 @@ const handleDeleteShopItem = async (itemId) => {
                 )}
 
                 {/* Promo Codes */}
-                {activeTab === 'promos' && (
-                    <div className="admin-section">
-                        <h1>Codes Promo</h1>
+{/* Promo Codes */}
+{activeTab === 'promos' && (
+    <div className="admin-section">
+
+        <h1>Codes Promo</h1>
+
+        {/* CREATE PROMO */}
+        <div className="promo-create">
+
+            <input
+                type="text"
+                placeholder="Code promo"
+                value={promoForm.code}
+                onChange={(e) =>
+                    setPromoForm({
+                        ...promoForm,
+                        code: e.target.value
+                    })
+                }
+            />
+
+            <select
+                value={promoForm.discount_type}
+                onChange={(e) =>
+                    setPromoForm({
+                        ...promoForm,
+                        discount_type: e.target.value
+                    })
+                }
+            >
+                <option value="percentage">Pourcentage</option>
+                <option value="fixed">Montant fixe</option>
+            </select>
+
+            <input
+                type="number"
+                placeholder="Valeur réduction"
+                value={promoForm.discount_value}
+                onChange={(e) =>
+                    setPromoForm({
+                        ...promoForm,
+                        discount_value: e.target.value
+                    })
+                }
+            />
+
+            <input
+                type="number"
+                placeholder="Utilisations max"
+                value={promoForm.max_uses}
+                onChange={(e) =>
+                    setPromoForm({
+                        ...promoForm,
+                        max_uses: e.target.value
+                    })
+                }
+            />
+
+            <input
+                type="number"
+                placeholder="Montant minimum"
+                value={promoForm.min_purchase_amount}
+                onChange={(e) =>
+                    setPromoForm({
+                        ...promoForm,
+                        min_purchase_amount: e.target.value
+                    })
+                }
+            />
+
+            <input
+                type="date"
+                value={promoForm.expiry_date}
+                onChange={(e) =>
+                    setPromoForm({
+                        ...promoForm,
+                        expiry_date: e.target.value
+                    })
+                }
+            />
+
+            <button
+                className="create-btn"
+                onClick={handleCreatePromo}
+            >
+                Créer le code promo
+            </button>
+        </div>
+
+                    {/* LIST */}
                         <div className="promo-list">
                             {promoCodes.map(promo => (
                                 <div key={promo.code} className="promo-item">
+
                                     <div className="promo-info">
                                         <h4>{promo.code}</h4>
+
                                         <p>
-                                            {promo.discount_type === 'percentage' ? 
-                                                `${promo.discount_value}% de réduction` : 
-                                                `-${promo.discount_value}€`
+                                            {promo.discount_type === 'percentage'
+                                                ? `${promo.discount_value}%`
+                                                : `-${promo.discount_value}€`
                                             }
                                         </p>
+
                                         {promo.max_uses && (
-                                            <p>Utilisations: {promo.current_uses}/{promo.max_uses}</p>
+                                            <p>
+                                                Utilisations :
+                                                {promo.current_uses}/{promo.max_uses}
+                                            </p>
                                         )}
+
                                         {promo.expiry_date && (
-                                            <p>Expire: {new Date(promo.expiry_date).toLocaleDateString('fr-FR')}</p>
+                                            <p>
+                                                Expire :
+                                                {new Date(promo.expiry_date)
+                                                    .toLocaleDateString('fr-FR')}
+                                            </p>
                                         )}
                                     </div>
+
                                     <div className="promo-status">
+
                                         <span className={`status ${promo.is_active ? 'active' : 'inactive'}`}>
                                             {promo.is_active ? 'Actif' : 'Inactif'}
                                         </span>
+
+                                        <button
+                                            className="delete-btn"
+                                            onClick={() => handleDeletePromo(promo.code)}
+                                        >
+                                            Supprimer
+                                        </button>
+
                                     </div>
+
                                 </div>
                             ))}
                         </div>

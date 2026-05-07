@@ -16,47 +16,55 @@ export default function Paiement() {
     const [emailValid, setEmailValid] = useState(false);
 
     const paymentInitializedRef = useRef(false);
-
-    const { cart, promoCode, promoDiscount, totalPrice } = location.state || {};
-
+    // 3. useEffect (ICI et seulement ici)
     useEffect(() => {
         checkAuth();
     }, []);
 
-    useEffect(() => {
-        if (user && cart && cart.length > 0 && !paymentInitializedRef.current) {
-            paymentInitializedRef.current = true;
-            initializePayment();
-        }
-    }, [user, cart]);
+const { cart = [], promoCode = null, promoDiscount = 0 } = location.state || {};
 
-    useEffect(() => {
-        const isValid = /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(paypalLoginEmail);
-        setEmailValid(isValid);
-    }, [paypalLoginEmail]);
+const subtotal = Array.isArray(cart)
+    ? cart.reduce((sum, item) => {
+        return sum + (Number(item.price) || 0) * (Number(item.quantity) || 0);
+    }, 0)
+    : 0;
 
-    const checkAuth = async () => {
+// priorité backend > frontend
+const backendDiscount = Number(paymentIntent?.discount ?? promoDiscount ?? 0);
+
+const total = Math.max(subtotal - backendDiscount, 0);
+
+const checkAuth = async () => {
+    try {
+        const res = await fetch('http://localhost:3000/api/me', {
+            credentials: 'include'
+        });
+
+        const text = await res.text();
+
+        let data;
         try {
-            const res = await fetch('/api/me', { credentials: 'include' });
-
-            if (res.ok) {
-                const data = await res.json();
-                if (data.loggedIn) {
-                    setUser(data.user);
-                } else {
-                    navigate('/auth/steam');
-                }
-            } else {
-                navigate('/');
-            }
-        } catch (err) {
-            console.error(err);
+            data = JSON.parse(text);
+        } catch {
+            console.error("API /me invalide:", text);
             navigate('/');
-        } finally {
-            setLoading(false);
+            return;
         }
-    };
 
+        if (!data.loggedIn) {
+            navigate('/auth/steam');
+            return;
+        }
+
+        setUser(data.user);
+
+    } catch (err) {
+        console.error("AUTH ERROR:", err);
+        navigate('/');
+    } finally {
+        setLoading(false);
+    }
+    };
     const initializePayment = async () => {
         try {
             setError(null);
@@ -113,8 +121,10 @@ export default function Paiement() {
                     state: {
                         orderId: paymentIntent.orderId,
                         items: cart,
-                        total: totalPrice - promoDiscount
+                        total: total
+                        
                     }
+                    
                 });
             } else {
                 const err = await res.json();
@@ -154,7 +164,7 @@ export default function Paiement() {
                 <div className="order-summary">
                     <h2>Résumé</h2>
 
-                    {cart.map(item => (
+                    {(cart || []).map(item => (
                         <div key={item.id} className="order-item">
                             <div className="item-info">
                                 <h4>{item.name}</h4>
@@ -166,12 +176,42 @@ export default function Paiement() {
                         </div>
                     ))}
 
-                    {/* 🔵 TOTAL SOUS LE RÉSUMÉ */}
+                    {/* CODE PROMO */}
+                    {promoCode && backendDiscount > 0 && (
+                        <div className="order-discount-box">
+                            <span>Code promo appliqué :</span>
+                            <span className="promo-code">
+                                {promoCode.toUpperCase()}
+                            </span>
+                        </div>
+                    )}
+
+                    {backendDiscount > 0 && (
+                        <div className="order-discount-box">
+                            <span>Réduction :</span>
+                            <span className="discount-amount">
+                                -{backendDiscount.toFixed(2)}€
+                            </span>
+                        </div>
+                    )}
+
+                    {/* TOTAL */}
                     <div className="order-total-box">
                         <span>Total :</span>
-                        <span className="order-total-amount">
-                            {(totalPrice - promoDiscount).toFixed(2)}€
-                        </span>
+
+                        <div className="total-price-container">
+
+                            {backendDiscount > 0 && (
+                                <span className="old-price">
+                                    {subtotal.toFixed(2)}€
+                                </span>
+                            )}
+
+                            <span className="order-total-amount">
+                                {total.toFixed(2)}€
+                            </span>
+
+                        </div>
                     </div>
                 </div>
 
@@ -210,7 +250,7 @@ export default function Paiement() {
             </div>
 
             <div className="paiement-footer">
-                <button className="back-btn" onClick={() => navigate('/boutique')}>
+                <button onClick={() => navigate('/boutique')}>
                     ← Retour boutique
                 </button>
             </div>
