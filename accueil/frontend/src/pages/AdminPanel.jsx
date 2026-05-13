@@ -1,18 +1,6 @@
 import React, { useState, useEffect } from 'react';
 import './AdminPanel.css';
 
-
-const res = await fetch(`/api/admin/promo-codes/${code}`, {
-    method: 'DELETE',
-    credentials: 'include'
-});
-
-const data = await res.json(); // 💥 crash si backend renvoie HTML ou vide
-
-if (!res.ok) {
-    return alert(data.error || 'Erreur suppression');
-}
-
 export default function AdminPanel() {
     const [admin, setAdmin] = useState(null);
     const [activeTab, setActiveTab] = useState('dashboard');
@@ -166,26 +154,12 @@ export default function AdminPanel() {
             if (!window.confirm('Supprimer cet article de la boutique ?')) return;
 
             try {
-                const res = await fetch(`/api/admin/items/${itemId}`, {
+                const res = await fetch(`/api/admin/shop/items/${itemId}`, {
                     method: 'DELETE',
                     credentials: 'include'
                 });
 
-                console.log("STATUS:", res.status);
-                console.log("CONTENT-TYPE:", res.headers.get("content-type"));
-                console.log("URL:", `/api/admin/shop/items/${itemId}`);
-
-                const text = await res.text();
-                console.log("RAW RESPONSE:", text);
-
-                let data;
-                try {
-                    data = JSON.parse(text);
-                } catch (e) {
-                    console.error("❌ Réponse NON JSON:", text);
-                    alert("Erreur serveur (réponse non JSON)");
-                    return;
-                }
+                const data = await res.json();
 
                 if (!res.ok) {
                     alert(data.error || 'Erreur suppression item');
@@ -196,7 +170,7 @@ export default function AdminPanel() {
 
             } catch (err) {
                 console.error('Fetch error:', err);
-                alert('Erreur serveur');
+                alert('Erreur serveur lors de la suppression');
             }
         };
 
@@ -290,20 +264,7 @@ const handleDeletePromo = async (code) => {
             credentials: 'include'
         });
 
-        console.log("STATUS:", res.status);
-        console.log("CONTENT-TYPE:", res.headers.get("content-type"));
-
-        const text = await res.text();
-        console.log("RAW RESPONSE:", text);
-
-        let data;
-        try {
-            data = JSON.parse(text);
-        } catch (e) {
-            console.error("❌ Réponse NON JSON:", text);
-            alert("Erreur serveur (réponse non JSON)");
-            return;
-        }
+        const data = await res.json();
 
         if (!res.ok) {
             alert(data.error || 'Erreur suppression');

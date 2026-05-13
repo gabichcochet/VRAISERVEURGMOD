@@ -413,14 +413,9 @@ router.delete('/promo-codes/:code', isAuthenticated, requireRank('admin'), (req,
     });
 });
 
-router.delete('/items/:itemId', isAuthenticated, requireRank('responsable'), (req, res) => {
+router.delete('/shop/items/:itemId', isAuthenticated, requireRank('responsable'), (req, res) => {
     const { itemId } = req.params;
     const admin = req.user;
-
-    const adminRanks = ['owner', 'superadmin', 'responsable'];
-    if (!adminRanks.includes(admin.rank)) {
-        return res.status(403).json({ error: 'Accès refusé' });
-    }
 
     db.run(
         `DELETE FROM shop_items WHERE id = ?`,
@@ -431,10 +426,20 @@ router.delete('/items/:itemId', isAuthenticated, requireRank('responsable'), (re
             }
 
             if (this.changes === 0) {
-                return res.status(404).json({ error: 'Item introuvable' });
+                return res.status(404).json({ error: 'Article introuvable' });
             }
 
-            res.json({ message: 'Item supprimé' });
+            logAdminAction(
+                admin.id,
+                'shop_item_deleted',
+                null,
+                'shop_item',
+                itemId,
+                {},
+                req.ip
+            );
+
+            res.json({ message: 'Article supprimé avec succès' });
         }
     );
 });
