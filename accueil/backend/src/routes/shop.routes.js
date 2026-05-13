@@ -194,11 +194,17 @@ router.post('/create-payment-intent', isAuthenticated, (req, res) => {
                 AND (expiry_date IS NULL OR expiry_date > datetime('now'))
             `, [promoCode.toUpperCase()], (err, promo) => {
                 if (!err && promo) {
-                    appliedPromo = promo;
-                    if (promo.discount_type === 'percentage') {
-                        finalTotal = total * (1 - promo.discount_value / 100);
-                    } else {
-                        finalTotal = Math.max(0, total - promo.discount_value);
+                    // Validation complète du code promo
+                    const isExhausted = promo.max_uses && promo.current_uses >= promo.max_uses;
+                    const isBelowMinimum = total < promo.min_purchase_amount;
+
+                    if (!isExhausted && !isBelowMinimum) {
+                        appliedPromo = promo;
+                        if (promo.discount_type === 'percentage') {
+                            finalTotal = total * (1 - promo.discount_value / 100);
+                        } else {
+                            finalTotal = Math.max(0, total - promo.discount_value);
+                        }
                     }
                 }
 
@@ -301,7 +307,7 @@ router.post('/confirm-payment', isAuthenticated, async (req, res) => {
     const whereParams = orderId ? [orderId, userId] : [paypalOrderId, userId];
 
     db.get(`
-        SELECT id, total_price, paypal_order_id, status
+        SELECT id, total_price, paypal_order_id, status, promo_code_used
         FROM shop_orders
         WHERE ${whereClause}
     `, whereParams, async (err, order) => {
@@ -335,6 +341,17 @@ router.post('/confirm-payment', isAuthenticated, async (req, res) => {
 
             if (this.changes === 0) {
                 return res.status(404).json({ error: 'Commande non trouvée ou déjà traitée' });
+            }
+
+            // Incrémenter l'utilisation du code promo si utilisé
+            if (order.promo_code_used) {
+                db.run(`
+                    UPDATE promo_codes
+                    SET current_uses = current_uses + 1
+                    WHERE code = ?
+                `, [order.promo_code_used], (err) => {
+                    if (err) console.error('Erreur incrément code promo:', err);
+                });
             }
 
             logAdminAction(null, 'order_completed', userId, 'order', effectiveOrderId, {

@@ -11,64 +11,62 @@ const db = new sqlite3.Database(dbPath, (err) => {
 
     console.log('✅ Connecté à la base de données');
 
-    // Ajouter des données de test
+    // Configuration des catégories Jujutsu Kaisen
     const categories = [
-        { name: 'Armes', description: 'Armes et équipements de combat', icon: '🔫' },
-        { name: 'Véhicules', description: 'Véhicules terrestres et aériens', icon: '🚗' },
-        { name: 'Cosmétiques', description: 'Skins et apparences personnalisées', icon: '🎨' }
+        { name: 'Grades & VIP', description: 'Améliorez votre statut sur le serveur', icon: '👑' },
+        { name: 'Techniques Maudites', description: 'Maîtrisez l\'énergie occulte', icon: '✨' },
+        { name: 'Objets Maudits', description: 'Reliques et armes de puissance', icon: '🗡️' },
+        { name: 'Cosmétiques', description: 'Apparences et effets visuels', icon: '🎭' }
     ];
 
     const items = [
-        { category_id: 1, name: 'AK-47 Gold', description: 'Arme légendaire avec finition dorée', price: 29.99, image_url: null, in_stock: 1 },
-        { category_id: 1, name: 'Sniper Elite', description: 'Fusil de précision haute performance', price: 49.99, image_url: null, in_stock: 1 },
-        { category_id: 2, name: 'Lamborghini Diablo', description: 'Voiture de sport italienne', price: 99.99, image_url: null, in_stock: 1 },
-        { category_id: 2, name: 'Hélicoptère Apache', description: 'Véhicule aérien militaire', price: 149.99, image_url: null, in_stock: 1 },
-        { category_id: 1, name: 'Fusil Plasma X', description: 'Arme futuriste de haute précision', price: 39.99, image_url: null, in_stock: 1 },
-        { category_id: 3, name: 'Skin Dragon Rouge', description: 'Apparence épique avec effets de feu', price: 19.99, image_url: null, in_stock: 1 },
-        { category_id: 3, name: 'Pack VIP Premium', description: 'Pack complet avec tous les cosmétiques', price: 79.99, image_url: null, in_stock: 1 }
+        // Grades
+        { category_id: 1, name: 'VIP Premium', description: 'Accès exclusif, salaire augmenté et slot réservé.', price: 19.99, image_url: null, in_stock: 1 },
+        { category_id: 1, name: 'Grade: Exorciste Classe S', description: 'Le rang le plus élevé pour les exorcistes d\'élite.', price: 49.99, image_url: null, in_stock: 1 },
+
+        // Techniques
+        { category_id: 2, name: 'Technique: Pourpre (Hollow Purple)', description: 'Fusion de l\'Infini et du Néant. Dégâts colossaux.', price: 34.99, image_url: null, in_stock: 1 },
+        { category_id: 2, name: 'Extension du Territoire', description: 'Capacité à déployer votre propre domaine occulte.', price: 24.99, image_url: null, in_stock: 1 },
+        { category_id: 2, name: 'Rayon Noir (Black Flash)', description: 'Augmente drastiquement vos chances de coups critiques.', price: 14.99, image_url: null, in_stock: 1 },
+
+        // Objets
+        { category_id: 3, name: 'Doigt de Sukuna', description: 'Objet maudit de classe spéciale. Augmente l\'énergie occulte.', price: 9.99, image_url: null, in_stock: 1 },
+        { category_id: 3, name: 'Katana Inversé (Toji)', description: 'Arme capable de neutraliser les techniques maudites.', price: 29.99, image_url: null, in_stock: 1 },
+        { category_id: 3, name: 'Lisière du Supplice (Prison Realm)', description: 'Relique capable de sceller n\'importe quel joueur.', price: 59.99, image_url: null, in_stock: 1 },
+
+        // Cosmétiques
+        { category_id: 4, name: 'Aura de l\'Infini', description: 'Effet visuel de distorsion autour de votre personnage.', price: 7.99, image_url: null, in_stock: 1 },
+        { category_id: 4, name: 'Skin: Sukuna (Forme Originelle)', description: 'Apparence exclusive du Roi des Fléaux.', price: 15.99, image_url: null, in_stock: 1 }
     ];
 
-    // Insérer les catégories
-    let catIndex = 0;
-    categories.forEach(cat => {
-        db.run(
-            'INSERT OR IGNORE INTO shop_categories (name, description, icon, order_index) VALUES (?, ?, ?, ?)',
-            [cat.name, cat.description, cat.icon, catIndex + 1],
-            function(err) {
-                if (err) {
-                    console.error('❌ Erreur insertion catégorie:', err);
-                } else {
-                    console.log(`✅ Catégorie ajoutée: ${cat.name}`);
-                }
-                catIndex++;
-                if (catIndex === categories.length) {
-                    insertItems();
-                }
-            }
-        );
-    });
+    db.serialize(() => {
+        // Nettoyer les anciennes données pour éviter les doublons ou conflits lors du test
+        db.run('DELETE FROM shop_items');
+        db.run('DELETE FROM shop_categories');
 
-    function insertItems() {
-        let itemIndex = 0;
-        items.forEach(item => {
-            db.run(
-                'INSERT OR IGNORE INTO shop_items (category_id, name, description, price, image_url, in_stock, order_index) VALUES (?, ?, ?, ?, ?, ?, ?)',
-                [item.category_id, item.name, item.description, item.price, item.image_url, item.in_stock, itemIndex + 1],
-                function(err) {
-                    if (err) {
-                        console.error('❌ Erreur insertion item:', err);
-                    } else {
-                        console.log(`✅ Item ajouté: ${item.name} - ${item.price}€`);
-                    }
-                    itemIndex++;
-                    if (itemIndex === items.length) {
-                        console.log('\n🎉 Données de test ajoutées avec succès!');
-                        console.log('Vous pouvez maintenant tester la boutique et le paiement.');
-                        db.close();
-                        process.exit(0);
-                    }
-                }
-            );
+        // Réinitialiser les auto-incréments
+        db.run('DELETE FROM sqlite_sequence WHERE name="shop_items"');
+        db.run('DELETE FROM sqlite_sequence WHERE name="shop_categories"');
+
+        console.log('🧹 Anciennes données supprimées.');
+
+        // Insérer les catégories
+        const insertCategory = db.prepare('INSERT INTO shop_categories (name, description, icon, order_index) VALUES (?, ?, ?, ?)');
+        categories.forEach((cat, i) => {
+            insertCategory.run(cat.name, cat.description, cat.icon, i + 1);
         });
-    }
+        insertCategory.finalize();
+        console.log('✅ Catégories Jujutsu Kaisen ajoutées.');
+
+        // Insérer les items
+        const insertItem = db.prepare('INSERT INTO shop_items (category_id, name, description, price, image_url, in_stock, order_index) VALUES (?, ?, ?, ?, ?, ?, ?)');
+        items.forEach((item, i) => {
+            insertItem.run(item.category_id, item.name, item.description, item.price, item.image_url, item.in_stock, i + 1);
+        });
+        insertItem.finalize();
+        console.log('✅ Articles Jujutsu Kaisen ajoutés.');
+
+        console.log('\n🎉 Boutique mise à jour avec l\'univers Jujutsu Kaisen !');
+        db.close();
+    });
 });

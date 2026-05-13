@@ -14,8 +14,9 @@ router.get(
   async (req, res) => {
     try {
         const steamId = req.user.steamId;
+        const displayName = req.user.profile.displayName;
 
-        const userRow = await findOrCreateBySteamId(steamId);
+        const userRow = await findOrCreateBySteamId(steamId, displayName);
 
         req.user.id = userRow.id;
         req.user.dbId = userRow.id;

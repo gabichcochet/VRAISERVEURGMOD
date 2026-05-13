@@ -31,15 +31,15 @@ export default function PaiementSucces() {
 
                     <div className="order-info">
                         <div className="info-row">
-                            <span>N° de commande:</span>
+                            <span>N° de commande :</span>
                             <span className="order-number">#{orderId}</span>
                         </div>
                         <div className="info-row">
-                            <span>Date:</span>
+                            <span>Date :</span>
                             <span>{new Date().toLocaleDateString('fr-FR')}</span>
                         </div>
                         <div className="info-row">
-                            <span>Total payé:</span>
+                            <span>Total payé :</span>
                             <span className="total-amount">{total?.toFixed(2)}€</span>
                         </div>
                     </div>

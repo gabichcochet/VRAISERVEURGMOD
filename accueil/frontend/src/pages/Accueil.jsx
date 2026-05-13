@@ -50,7 +50,7 @@ export default function Accueil() {
               <div className="user-logged">
                 <div className="user-details">
                   <span className="user-label">Connecté en tant que</span>
-                  <span className="user-steamid">{user.steamId}</span>
+                  <span className="user-name">{user.username || user.steamId}</span>
                 </div>
                 <a href="http://localhost:3000/logout" className="auth-button logout-btn">
                   Se déconnecter

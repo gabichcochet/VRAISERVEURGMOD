@@ -2,7 +2,7 @@ const sqlite3 = require('sqlite3').verbose();
 const path = require('path');
 
 const dbPath = path.join(__dirname, 'db.sqlite');
-const steamId = '76561199237398386';
+const steamId = 'TONN_STEAM_ID_ICI';
 const username = 'Admin_User';
 
 const db = new sqlite3.Database(dbPath, (err) => {
