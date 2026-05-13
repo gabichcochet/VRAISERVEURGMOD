@@ -344,7 +344,7 @@ const handleDeletePromo = async (code) => {
                                 <p className="big-number">{stats.totalOrders}</p>
                             </div>
                             <div className="dashboard-card">
-                                <h3>Revenus</h3>
+                                <h3>dépenses</h3>
                                 <p className="big-number">{stats.totalRevenue}€</p>
                             </div>
                             <div className="dashboard-card danger">

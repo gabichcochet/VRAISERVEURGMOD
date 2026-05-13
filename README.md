@@ -23,3 +23,17 @@ cd frontend
 ```
 npm run dev
 ```
+
+
+### Se promouvoir en admin
+
+
+-Allez dans le fichier promote-admin.js
+-Mettez votre ID steam 
+
+-Exécutez :
+
+
+```
+node .\accueil\backend\promote-admin.js 
+```
