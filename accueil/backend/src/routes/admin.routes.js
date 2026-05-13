@@ -413,6 +413,32 @@ router.delete('/promo-codes/:code', isAuthenticated, requireRank('admin'), (req,
     });
 });
 
+router.delete('/items/:itemId', isAuthenticated, requireRank('responsable'), (req, res) => {
+    const { itemId } = req.params;
+    const admin = req.user;
+
+    const adminRanks = ['owner', 'superadmin', 'responsable'];
+    if (!adminRanks.includes(admin.rank)) {
+        return res.status(403).json({ error: 'Accès refusé' });
+    }
+
+    db.run(
+        `DELETE FROM shop_items WHERE id = ?`,
+        [itemId],
+        function (err) {
+            if (err) {
+                return res.status(500).json({ error: err.message });
+            }
+
+            if (this.changes === 0) {
+                return res.status(404).json({ error: 'Item introuvable' });
+            }
+
+            res.json({ message: 'Item supprimé' });
+        }
+    );
+});
+
 router.post('/promo-codes/validate', isAuthenticated, (req, res) => {
 
     const { code, parsedTotal } = req.body;
@@ -483,5 +509,6 @@ router.post('/promo-codes/validate', isAuthenticated, (req, res) => {
         });
     });
 });
+
 
 module.exports = router;

@@ -13,6 +13,21 @@ function createLocalPayment(total, dbOrderId, items) {
     };
 }
 
+function attachDbUser(req, res, next) {
+    if (!req.user?.steamId) return res.sendStatus(401);
+
+    db.get(
+        'SELECT id, rank FROM users WHERE steam_id = ?',
+        [req.user.steamId],
+        (err, row) => {
+            if (err || !row) return res.sendStatus(401);
+            req.dbUser = row;
+            next();
+        }
+    );
+}
+
+
 // Middleware pour vérifier l'authentification
 const isAuthenticated = (req, res, next) => {
     if (req.isAuthenticated()) {
@@ -488,3 +503,4 @@ function logAdminAction(adminId, action, targetUserId, resourceType, resourceId,
 }
 
 module.exports = router;
+

@@ -2,6 +2,17 @@ import React, { useState, useEffect } from 'react';
 import './AdminPanel.css';
 
 
+const res = await fetch(`/api/admin/promo-codes/${code}`, {
+    method: 'DELETE',
+    credentials: 'include'
+});
+
+const data = await res.json(); // 💥 crash si backend renvoie HTML ou vide
+
+if (!res.ok) {
+    return alert(data.error || 'Erreur suppression');
+}
+
 export default function AdminPanel() {
     const [admin, setAdmin] = useState(null);
     const [activeTab, setActiveTab] = useState('dashboard');
@@ -151,30 +162,44 @@ export default function AdminPanel() {
             console.error('Erreur chargement promos:', err);
         }
     };
-const handleDeleteShopItem = async (itemId) => {
-    if (!window.confirm('Supprimer cet article de la boutique ?')) return;
+        const handleDeleteShopItem = async (itemId) => {
+            if (!window.confirm('Supprimer cet article de la boutique ?')) return;
 
-    try {
-        const res = await fetch(`/api/admin/shop/items/${itemId}`, {
-            method: 'DELETE',
-            credentials: 'include'
-        });
+            try {
+                const res = await fetch(`/api/admin/items/${itemId}`, {
+                    method: 'DELETE',
+                    credentials: 'include'
+                });
 
-        const data = await res.json().catch(() => ({}));
+                console.log("STATUS:", res.status);
+                console.log("CONTENT-TYPE:", res.headers.get("content-type"));
+                console.log("URL:", `/api/admin/shop/items/${itemId}`);
 
-        if (!res.ok) {
-            alert(data.error || 'Erreur suppression item');
-            return;
-        }
+                const text = await res.text();
+                console.log("RAW RESPONSE:", text);
 
-        // update UI instant
-        setShopItems(prev => prev.filter(item => item.id !== itemId));
+                let data;
+                try {
+                    data = JSON.parse(text);
+                } catch (e) {
+                    console.error("❌ Réponse NON JSON:", text);
+                    alert("Erreur serveur (réponse non JSON)");
+                    return;
+                }
 
-    } catch (err) {
-        console.error(err);
-        alert('Erreur serveur');
-    }
-};
+                if (!res.ok) {
+                    alert(data.error || 'Erreur suppression item');
+                    return;
+                }
+
+                setShopItems(prev => prev.filter(item => item.id !== itemId));
+
+            } catch (err) {
+                console.error('Fetch error:', err);
+                alert('Erreur serveur');
+            }
+        };
+
 
     const handleIssueSanction = async (userId, type, reason, duration) => {
         try {
@@ -256,31 +281,44 @@ const handleDeleteShopItem = async (itemId) => {
     };
 
 
-        const handleDeletePromo = async (code) => {
+const handleDeletePromo = async (code) => {
+    if (!window.confirm(`Supprimer ${code} ?`)) return;
 
-        if (!window.confirm(`Supprimer ${code} ?`)) return;
+    try {
+        const res = await fetch(`/api/admin/promo-codes/${code}`, {
+            method: 'DELETE',
+            credentials: 'include'
+        });
 
+        console.log("STATUS:", res.status);
+        console.log("CONTENT-TYPE:", res.headers.get("content-type"));
+
+        const text = await res.text();
+        console.log("RAW RESPONSE:", text);
+
+        let data;
         try {
-            const res = await fetch(`/api/admin/promo-codes/${code}`, {
-                method: 'DELETE',
-                credentials: 'include'
-            });
-
-            const data = await res.json();
-
-            if (!res.ok) {
-                return alert(data.error || 'Erreur suppression');
-            }
-
-            setPromoCodes(prev =>
-                prev.filter(p => p.code !== code)
-            );
-
-        } catch (err) {
-            console.error(err);
-            alert('Erreur serveur');
+            data = JSON.parse(text);
+        } catch (e) {
+            console.error("❌ Réponse NON JSON:", text);
+            alert("Erreur serveur (réponse non JSON)");
+            return;
         }
-    };
+
+        if (!res.ok) {
+            alert(data.error || 'Erreur suppression');
+            return;
+        }
+
+        setPromoCodes(prev =>
+            prev.filter(p => p.code !== code)
+        );
+
+    } catch (err) {
+        console.error(err);
+        alert('Erreur serveur');
+    }
+};
     if (loading) {
         return <div className="admin-loading">Chargement...</div>;
     }

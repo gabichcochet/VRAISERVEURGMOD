@@ -14,12 +14,14 @@ export default function Paiement() {
 
     const [paypalLoginEmail, setPaypalLoginEmail] = useState('');
     const [emailValid, setEmailValid] = useState(false);
-
     const paymentInitializedRef = useRef(false);
     // 3. useEffect (ICI et seulement ici)
     useEffect(() => {
         checkAuth();
     }, []);
+    const validateEmail = (email) => {
+    return /^[^\s@]+@[^\s@]+\.[^\s@]+$/.test(email);
+    };
 
 const { cart = [], promoCode = null, promoDiscount = 0 } = location.state || {};
 
@@ -94,42 +96,71 @@ const checkAuth = async () => {
         e.preventDefault();
 
         if (!emailValid) {
-            setError("Veuillez entrer un email valide avant de continuer.");
-            return;
-        }
-
-        if (paymentIntent?.approvalUrl) {
-            window.location.href = paymentIntent.approvalUrl;
+            setError("Email invalide");
             return;
         }
 
         setProcessing(true);
 
         try {
+            let intent = paymentIntent;
+
+            // 1. créer paiement si pas encore existant
+            if (!intent) {
+                const res = await fetch('/api/shop/create-payment-intent', {
+                    method: 'POST',
+                    headers: { 'Content-Type': 'application/json' },
+                    credentials: 'include',
+                    body: JSON.stringify({
+                        items: cart.map(i => ({ itemId: i.id, quantity: i.quantity })),
+                        promoCode: promoCode || null
+                    })
+                });
+
+                const data = await res.json();
+
+                if (!res.ok) {
+                    setError(data.error || "Erreur paiement");
+                    setProcessing(false);
+                    return;
+                }
+
+                setPaymentIntent(data);
+                intent = data;
+
+                // 🔥 IMPORTANT : STOP ici
+                if (intent.approvalUrl) {
+                    window.location.href = intent.approvalUrl;
+                    return;
+                }
+            }
+
+            // 2. confirm (si retour PayPal déjà fait)
             const res = await fetch('/api/shop/confirm-payment', {
                 method: 'POST',
                 headers: { 'Content-Type': 'application/json' },
                 credentials: 'include',
                 body: JSON.stringify({
-                    paypalOrderId: paymentIntent.paypalOrderId,
-                    orderId: paymentIntent.orderId
+                    paypalOrderId: intent.paypalOrderId,
+                    orderId: intent.orderId
                 })
             });
 
-            if (res.ok) {
-                navigate('/paiement/succes', {
-                    state: {
-                        orderId: paymentIntent.orderId,
-                        items: cart,
-                        total: total
-                        
-                    }
-                    
-                });
-            } else {
-                const err = await res.json();
-                setError(err.error);
+            const result = await res.json();
+
+            if (!res.ok) {
+                setError(result.error || "Erreur confirmation");
+                return;
             }
+
+            navigate('/paiement/succes', {
+                state: {
+                    orderId: intent.orderId,
+                    items: cart,
+                    total
+                }
+            });
+
         } catch (err) {
             setError("Erreur connexion");
         } finally {
@@ -177,7 +208,7 @@ const checkAuth = async () => {
                     ))}
 
                     {/* CODE PROMO */}
-                    {promoCode && backendDiscount > 0 && (
+                    {promoCode && (
                         <div className="order-discount-box">
                             <span>Code promo appliqué :</span>
                             <span className="promo-code">
@@ -188,7 +219,7 @@ const checkAuth = async () => {
 
                     {backendDiscount > 0 && (
                         <div className="order-discount-box">
-                            <span>Réduction :</span>
+                            <span>Réduction : </span>
                             <span className="discount-amount">
                                 -{backendDiscount.toFixed(2)}€
                             </span>
@@ -202,9 +233,13 @@ const checkAuth = async () => {
                         <div className="total-price-container">
 
                             {backendDiscount > 0 && (
-                                <span className="old-price">
-                                    {subtotal.toFixed(2)}€
-                                </span>
+                                <div className="price-comparison">
+                                    <span className="old-price">
+                                        {subtotal.toFixed(2)}€
+                                    </span>
+
+                                    <span className="arrow">→</span>
+                                </div>
                             )}
 
                             <span className="order-total-amount">
@@ -230,7 +265,11 @@ const checkAuth = async () => {
                                 type="email"
                                 placeholder="Email PayPal"
                                 value={paypalLoginEmail}
-                                onChange={(e) => setPaypalLoginEmail(e.target.value)}
+                                onChange={(e) => {
+                                    const value = e.target.value;
+                                    setPaypalLoginEmail(value);
+                                    setEmailValid(validateEmail(value));
+                                }}
                             />
 
                             <button
@@ -250,7 +289,10 @@ const checkAuth = async () => {
             </div>
 
             <div className="paiement-footer">
-                <button onClick={() => navigate('/boutique')}>
+                <button
+                    className="back-btn"
+                    onClick={() => navigate('/boutique')}
+                >
                     ← Retour boutique
                 </button>
             </div>

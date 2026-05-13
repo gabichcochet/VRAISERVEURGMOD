@@ -161,17 +161,18 @@ export default function Boutique() {
         if (!user) return alert("Connecte-toi !");
         if (cart.length === 0) return alert("Panier vide");
 
-        localStorage.removeItem('cart');
-        setCart([]);
-
         navigate('/paiement', {
             state: {
                 cart,
                 promoCode,
+                promoDiscount
             }
         });
-    };
 
+        // vide APRES navigation
+        localStorage.removeItem('cart');
+        setCart([]);
+    };
     return (
         <div className="boutique-container">
 

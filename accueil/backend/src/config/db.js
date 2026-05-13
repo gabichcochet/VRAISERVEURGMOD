@@ -68,27 +68,27 @@ function initializeDatabase() {
 
         // ================= SHOP ORDERS =================
         db.run(`
-    CREATE TABLE IF NOT EXISTS shop_orders (
-        id INTEGER PRIMARY KEY AUTOINCREMENT,
-        user_id INTEGER NOT NULL,
-        total_price REAL NOT NULL,
-        paypal_order_id TEXT UNIQUE,
-        promo_code_used TEXT,
-        status TEXT DEFAULT 'pending',
-        created_at TEXT DEFAULT CURRENT_TIMESTAMP,
-        completed_at TEXT,
-        FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        CREATE TABLE IF NOT EXISTS shop_orders (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            total_price REAL NOT NULL,
+            paypal_order_id TEXT UNIQUE,
+            status TEXT DEFAULT 'pending',
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
+        );
     )
 `);
         db.run(`
-        CREATE TABLE IF NOT EXISTS shop_order_items (
-            id INTEGER PRIMARY KEY AUTOINCREMENT,
-            order_id INTEGER NOT NULL,
-            item_id INTEGER NOT NULL,
-            quantity INTEGER DEFAULT 1,
-            price REAL,
-            FOREIGN KEY (order_id) REFERENCES shop_orders(id) ON DELETE CASCADE,
-            FOREIGN KEY (item_id) REFERENCES shop_items(id) ON DELETE CASCADE
+            CREATE TABLE IF NOT EXISTS shop_order_items (
+                id INTEGER PRIMARY KEY AUTOINCREMENT,
+                order_id INTEGER NOT NULL,
+                item_id INTEGER NOT NULL,
+                quantity INTEGER DEFAULT 1,
+                price REAL,
+                FOREIGN KEY (order_id) REFERENCES shop_orders(id) ON DELETE CASCADE,
+                FOREIGN KEY (item_id) REFERENCES shop_items(id)
+                );
             )
         `);
         // ================= SHOP CART =================
@@ -142,6 +142,19 @@ function initializeDatabase() {
             FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE
         )
         `);
+        db.run(`
+        CREATE TABLE IF NOT EXISTS user_inventory (
+            id INTEGER PRIMARY KEY AUTOINCREMENT,
+            user_id INTEGER NOT NULL,
+            item_id INTEGER NOT NULL,
+            quantity INTEGER DEFAULT 1,
+            source_order_id INTEGER,
+            created_at TEXT DEFAULT CURRENT_TIMESTAMP,
+            FOREIGN KEY (user_id) REFERENCES users(id) ON DELETE CASCADE,
+            FOREIGN KEY (item_id) REFERENCES shop_items(id),
+            FOREIGN KEY (source_order_id) REFERENCES shop_orders(id)
+        );`)
+
 
         // ================= ADMIN LOGS =================
         db.run(`

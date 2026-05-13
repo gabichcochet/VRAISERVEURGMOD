@@ -4,11 +4,10 @@ const db = require('../config/db');
 
 // Middleware pour vérifier l'authentification
 const isAuthenticated = (req, res, next) => {
-    if (req.isAuthenticated()) {
-        next();
-    } else {
-        res.status(401).json({ error: 'Non authentifié' });
+    if (req.isAuthenticated() && req.user) {
+        return next();
     }
+    return res.status(401).json({ error: 'Non authentifié' });
 };
 
 // ============ PROFIL UTILISATEUR ============
@@ -220,6 +219,10 @@ router.get('/history/purchases', isAuthenticated, (req, res) => {
 router.get('/admin/users/:userId', isAuthenticated, (req, res) => {
     const { userId } = req.params;
     const admin = req.user;
+
+    if (!admin) {
+    return res.status(401).json({ error: "Non authentifié" });
+    }
 
     // Vérifier permission
     const adminRanks = ['owner', 'superadmin', 'responsable', 'admin', 'moderator'];
