@@ -48,6 +48,9 @@ export default function Accueil() {
           <div className="auth-section">
             {user ? (
               <div className="user-logged">
+                {user.avatar_url && (
+                  <img src={user.avatar_url} alt="Avatar" className="user-avatar-mini" />
+                )}
                 <div className="user-details">
                   <span className="user-label">Connecté en tant que</span>
                   <span className="user-name">{user.username || user.steamId}</span>

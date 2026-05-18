@@ -140,6 +140,15 @@ body {
   border: 1px solid rgba(230, 67, 67, 0.2);
 }
 
+.user-avatar-mini {
+  width: 60px;
+  height: 60px;
+  border-radius: 50%;
+  border: 2px solid #e64343;
+  object-fit: cover;
+  box-shadow: 0 0 10px rgba(230, 67, 67, 0.3);
+}
+
 .user-details {
   display: flex;
   flex-direction: column;

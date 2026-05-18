@@ -15,13 +15,15 @@ router.get(
     try {
         const steamId = req.user.steamId;
         const displayName = req.user.profile.displayName;
+        const avatarUrl = req.user.profile.photos?.[2]?.value || req.user.profile._json?.avatarfull || null;
 
-        const userRow = await findOrCreateBySteamId(steamId, displayName);
+        const userRow = await findOrCreateBySteamId(steamId, displayName, avatarUrl);
 
         req.user.id = userRow.id;
         req.user.dbId = userRow.id;
         req.user.rank = userRow.rank || 'user';
         req.user.username = userRow.username;
+        req.user.avatar_url = userRow.avatar_url;
 
         res.redirect('http://localhost:5173/');
     } catch (err) {
@@ -40,7 +42,7 @@ router.get('/me', async (req, res) => {
   try {
     const user = await new Promise((resolve, reject) => {
       db.get(
-        'SELECT id, steam_id, username, rank FROM users WHERE steam_id = ?',
+        'SELECT id, steam_id, username, avatar_url, rank FROM users WHERE steam_id = ?',
         [req.user.steamId],
         (err, row) => {
           if (err) return reject(err);
@@ -59,6 +61,7 @@ router.get('/me', async (req, res) => {
         dbId: user.id,
         steamId: user.steam_id,
         username: user.username,
+        avatar_url: user.avatar_url,
         rank: user.rank,
       },
     });

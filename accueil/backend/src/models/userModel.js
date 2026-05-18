@@ -1,6 +1,6 @@
 const db = require('../config/db');
 
-function findOrCreateBySteamId(steamId, displayName){
+function findOrCreateBySteamId(steamId, displayName, avatarUrl){
     return new Promise((resolve, reject) => {
         db.get(
             'SELECT * FROM users WHERE steam_id = ?',
@@ -9,14 +9,15 @@ function findOrCreateBySteamId(steamId, displayName){
                 if (err) return reject(err);
 
                 if (row) {
-                    // Si l'utilisateur existe déjà mais n'a pas de pseudo ou si on veut le mettre à jour
-                    if (!row.username && displayName) {
+                    // Mettre à jour le pseudo ou l'avatar s'ils ont changé
+                    if (row.username !== displayName || row.avatar_url !== avatarUrl) {
                         db.run(
-                            'UPDATE users SET username = ? WHERE steam_id = ?',
-                            [displayName, steamId],
+                            'UPDATE users SET username = ?, avatar_url = ? WHERE steam_id = ?',
+                            [displayName, avatarUrl, steamId],
                             (errUpdate) => {
                                 if (errUpdate) return reject(errUpdate);
                                 row.username = displayName;
+                                row.avatar_url = avatarUrl;
                                 resolve(row);
                             }
                         );
@@ -25,8 +26,8 @@ function findOrCreateBySteamId(steamId, displayName){
                     }
                 } else {
                     db.run(
-                        'INSERT INTO users (steam_id, username) VALUES (?, ?)',
-                        [steamId, displayName],
+                        'INSERT INTO users (steam_id, username, avatar_url) VALUES (?, ?, ?)',
+                        [steamId, displayName, avatarUrl],
                         function (err2) {
                             if (err2) return reject(err2);
 
