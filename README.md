@@ -3,11 +3,10 @@
 ## Le site
 
 
-(dépendant de la branche)
 Dans un premier terminal, on lance :
 
 ```
-cd backend
+cd accueil/backend
 ```
 
 ```
@@ -17,7 +16,7 @@ npm start
 On lance dans un autre terminal :
 
 ```
-cd frontend
+cd accueil/frontend
 ```
 
 ```
@@ -32,7 +31,6 @@ npm run dev
 -Mettez votre ID steam 
 
 -Exécutez :
-
 
 ```
 node .\accueil\backend\promote-admin.js 
