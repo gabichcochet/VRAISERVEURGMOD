@@ -44,7 +44,7 @@ export default function Accueil() {
               Rejoignez la communauté et participez à des aventures épiques !
             </p>
           </div>
-          
+
           <div className="auth-section">
             {user ? (
               <div className="user-logged">
@@ -67,6 +67,21 @@ export default function Accueil() {
                 </a>
               </div>
             )}
+
+            <div className="social-links" style={{ display: 'flex', gap: '30px', justifyContent: 'center', marginTop: '30px', fontSize: '35px', zIndex: 3, position: 'relative' }}>
+              <a href="https://www.instagram.com/jujutsukaisen.gmod/" target="_blank" rel="noopener noreferrer" style={{ color: 'white', textDecoration: 'none' }}>
+                <i className="fab fa-instagram"></i>
+              </a>
+              <a href="https://www.youtube.com/channel/UC4WA9U5uoC7F9zcw8M_Is7g" target="_blank" rel="noopener noreferrer" style={{ color: 'white', textDecoration: 'none' }}>
+                <i className="fab fa-youtube"></i>
+              </a>
+              <a href="https://www.tiktok.com/@jujutsukaisen5463" target="_blank" rel="noopener noreferrer" style={{ color: 'white', textDecoration: 'none' }}>
+                <i className="fab fa-tiktok"></i>
+              </a>
+              <a href="https://discord.gg/s6sJyV8w" target="_blank" rel="noopener noreferrer" style={{ color: 'white', textDecoration: 'none' }}>
+                <i className="fab fa-discord"></i>
+              </a>
+            </div>
           </div>
         </div>
       </header>

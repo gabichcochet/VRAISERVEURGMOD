@@ -44,7 +44,7 @@ body {
   display: flex;
   justify-content: center;
   align-items: center;
-  overflow: hidden;
+  overflow: visible;
 }
 
 .header::before {
@@ -66,18 +66,19 @@ body {
   justify-content: center;
   align-items: center;
   width: 100%;
-  height: 100%;
-  gap: 40px;
+  padding: 50px 0;
+  gap: 0,5px;
 }
 
 .header .overlay {
   text-align: center;
   background: rgba(0, 0, 0, 0.5);
-  padding: 50px;
+  padding: 30px;
   border-radius: 15px;
   width: 80%;
   max-width: 700px;
   border: 2px solid rgba(230, 67, 67, 0.3);
+  margin-bottom: 10px;
 }
 
 .header h1 {
@@ -135,7 +136,7 @@ body {
   align-items: center;
   gap: 15px;
   background: rgba(0, 0, 0, 0.6);
-  padding: 25px;
+  padding: 5px;
   border-radius: 12px;
   border: 1px solid rgba(230, 67, 67, 0.2);
 }
@@ -183,7 +184,7 @@ body {
   padding: 12px 30px;
   border: none;
   border-radius: 8px;
-  font-weight: 600;
+  font-weight: 60;
   text-decoration: none;
   cursor: pointer;
   transition: 0.3s ease;
